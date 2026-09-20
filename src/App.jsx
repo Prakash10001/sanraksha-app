@@ -1,6 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing.jsx";
-import Dashboard from "./pages/Dashboard.jsx";
+import PatientDashboard from "./pages/PatientDashboard.jsx";
+import DoctorDashboard from "./pages/DoctorDashboard.jsx";
+import AdminDashboard from "./pages/AdminDashboard.jsx";
 import PatientPortal from "./pages/PatientPortal.jsx";
 import BookAppointment from "./pages/BookAppointment.jsx";
 import AppointmentConfirmed from "./pages/AppointmentConfirmed.jsx";
@@ -12,7 +14,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/patient-dashboard" element={<PatientDashboard />} />
+      <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
+      <Route path="/admin-dashboard" element={<AdminDashboard />} />
       <Route path="/portal" element={<PatientPortal />} />
       <Route path="/book" element={<BookAppointment />} />
       <Route path="/book/confirmed" element={<AppointmentConfirmed />} />

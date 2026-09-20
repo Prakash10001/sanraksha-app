@@ -4,7 +4,6 @@ import { useAuth } from "../context/AuthContext";
 import AuthTabs from "../components/AuthTabs";
 import SiteFooter from "../components/SiteFooter.jsx";
 
-
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -28,17 +27,13 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      await register(form);
-      navigate("/dashboard");
+      const data = await register(form);
+      if (data.role === "DOCTOR") navigate("/doctor-dashboard");
+      else if (data.role === "ADMIN") navigate("/admin-dashboard");
+      else navigate("/patient-dashboard");
     } catch (err) {
-  console.error("Registration error:", err);
-
-  setError(
-    err?.response?.data?.message ||
-    err?.response?.data?.error ||
-    `Registration failed. Status: ${err?.response?.status || "Unknown"}`
-  );
-} finally {
+      setError(err?.response?.data?.error || "Registration failed. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -46,9 +41,7 @@ export default function Register() {
   return (
     <div className="auth-page">
       <div className="auth-card-wrapper">
-
       <div className="auth-card">
-        
         <AuthTabs active="register" />
 
         <h1>Sign Up</h1>
@@ -92,8 +85,8 @@ export default function Register() {
       </div>
       </div>
       <div className="auth-footer">
-      <SiteFooter />
-      </div>
+              <SiteFooter />
+            </div>
     </div>
   );
 }

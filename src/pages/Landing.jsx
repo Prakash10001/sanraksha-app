@@ -31,7 +31,7 @@ const FEATURES = [
 export default function Landing() {
   return (
     <div>
-      <Header navLinks={PUBLIC_NAV} cta={{ label: "Sign in", to: "/portal" }} />
+      <Header navLinks={PUBLIC_NAV} cta={{ label: "Sign in", to: "/login" }} />
       <section className="hero">
         <div className="hero-text">
           <h1>Every patient record, every shift, every bill — looked after in one place.</h1>
