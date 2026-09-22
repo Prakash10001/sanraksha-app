@@ -9,7 +9,8 @@ export default function PatientDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const initials = (user?.fullName || "Patient")
+  const displayName = user?.fullName || user?.name || user?.email || "Patient";
+  const initials = displayName
     .split(" ")
     .map((namePart) => namePart[0])
     .join("")
@@ -30,11 +31,11 @@ export default function PatientDashboard() {
     <>
       <Header
         navLinks={[]}
-        user={{ initials, name: user?.fullName || "Patient", role: "Patient" }}
+        user={{ initials, name: displayName, role: "Patient" }}
       />
       <div className="page">
       <div className="page-head">
-        <h1>Welcome, {user?.fullName || "Patient"}</h1>
+        <h1>Welcome, {displayName}</h1>
         <p>Here's a quick look at your care.</p>
       </div>
 

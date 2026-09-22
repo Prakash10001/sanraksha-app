@@ -19,7 +19,8 @@ export default function Login() {
     setLoading(true);
     try {
       const data = await login(email, password);
-      if (data.role === "DOCTOR") navigate("/doctor-dashboard");
+      if (data.mustResetPassword) navigate("/reset-password?firstLogin=true");
+      else if (data.role === "DOCTOR") navigate("/doctor-dashboard");
       else if (data.role === "ADMIN") navigate("/admin-dashboard");
       else navigate("/patient-dashboard");
     } catch (err) {

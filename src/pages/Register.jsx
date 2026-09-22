@@ -4,8 +4,21 @@ import { useAuth } from "../context/AuthContext";
 import AuthTabs from "../components/AuthTabs";
 import SiteFooter from "../components/SiteFooter.jsx";
 
+const roleChoices = [
+  { value: "PATIENT", label: "Patient", description: "Manage your care and appointments", icon: "P" },
+  { value: "DOCTOR", label: "Doctor", description: "Manage your patient queue", icon: "D" },
+  { value: "ADMIN", label: "Admin", description: "Manage the hospital", icon: "A" },
+];
+
+const genderChoices = [
+  { value: "FEMALE", label: "Female" },
+  { value: "MALE", label: "Male" },
+  { value: "OTHER", label: "Other" },
+  { value: "PREFER_NOT_TO_SAY", label: "Prefer not to say" },
+];
+
 export default function Register() {
-  const { register } = useAuth();
+  const { register, login } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -13,6 +26,7 @@ export default function Register() {
     email: "",
     password: "",
     role: "PATIENT",
+    gender: "",
     specialization: "",
   });
   const [error, setError] = useState("");
@@ -27,9 +41,10 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      const data = await register(form);
-      if (data.role === "DOCTOR") navigate("/doctor-dashboard");
-      else if (data.role === "ADMIN") navigate("/admin-dashboard");
+      await register(form);
+      const loggedInData = await login(form.email, form.password);
+      if (loggedInData.role === "DOCTOR") navigate("/doctor-dashboard");
+      else if (loggedInData.role === "ADMIN") navigate("/admin-dashboard");
       else navigate("/patient-dashboard");
     } catch (err) {
       setError(err?.response?.data?.error || "Registration failed. Please try again.");
@@ -59,12 +74,51 @@ export default function Register() {
           <label>Password</label>
           <input type="password" name="password" value={form.password} onChange={handleChange} minLength={6} required />
 
-          <label>Role</label>
-          <select name="role" value={form.role} onChange={handleChange}>
-            <option value="PATIENT">Patient</option>
-            <option value="DOCTOR">Doctor</option>
-            <option value="ADMIN">Admin</option>
-          </select>
+          <div className="auth-field-heading">
+            <label>Choose your role</label>
+            <span>What brings you to Sanraksha?</span>
+          </div>
+          <div className="choice-grid role-grid" role="radiogroup" aria-label="Choose your role">
+            {roleChoices.map((choice) => (
+              <button
+                key={choice.value}
+                type="button"
+                className={`choice-card ${form.role === choice.value ? "selected" : ""}`}
+                aria-pressed={form.role === choice.value}
+                onClick={() => setForm({ ...form, role: choice.value, gender: choice.value === "PATIENT" ? form.gender : "" })}
+              >
+                <span className="choice-icon">{choice.icon}</span>
+                <span className="choice-copy">
+                  <strong>{choice.label}</strong>
+                  <small>{choice.description}</small>
+                </span>
+                <span className="choice-check" aria-hidden="true">✓</span>
+              </button>
+            ))}
+          </div>
+
+          {form.role === "PATIENT" && (
+            <>
+              <div className="auth-field-heading gender-heading">
+                <label>Gender</label>
+                <span>Used to personalize your care records</span>
+              </div>
+              <div className="choice-grid gender-grid" role="radiogroup" aria-label="Choose your gender">
+                {genderChoices.map((choice) => (
+                  <button
+                    key={choice.value}
+                    type="button"
+                    className={`choice-pill ${form.gender === choice.value ? "selected" : ""}`}
+                    aria-pressed={form.gender === choice.value}
+                    onClick={() => setForm({ ...form, gender: choice.value })}
+                  >
+                    <span className="choice-radio" aria-hidden="true"></span>
+                    {choice.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           {form.role === "DOCTOR" && (
             <>

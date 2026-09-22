@@ -18,7 +18,8 @@ export function AuthProvider({ children }) {
       password,
     });
 
-    const { token, fullName, role } = response.data;
+    const { token, fullName, name, role, mustResetPassword } = response.data;
+    const displayName = fullName || name || email;
 
     // Save JWT
     sessionStorage.setItem("hms_token", token);
@@ -26,10 +27,10 @@ export function AuthProvider({ children }) {
     // Save logged-in user
     const loggedInUser = {
       email,
-      fullName,
+      fullName: displayName,
       role,
+      mustResetPassword: Boolean(mustResetPassword),
     };
-
     localStorage.setItem("user", JSON.stringify(loggedInUser));
     setUser(loggedInUser);
 
