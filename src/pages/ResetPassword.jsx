@@ -33,6 +33,11 @@ export default function ResetPassword() {
     try {
       if (firstLogin) {
         await axiosClient.post("/auth/change-password", { newPassword: password });
+        const savedUser = localStorage.getItem("user");
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          localStorage.setItem("user", JSON.stringify({ ...user, mustResetPassword: false }));
+        }
       } else {
         await axiosClient.post("/auth/reset-password", { token, newPassword: password });
       }
@@ -41,7 +46,9 @@ export default function ResetPassword() {
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
-          "This reset link is invalid or has expired."
+          (firstLogin
+            ? "Unable to change the temporary password. Check that the backend supports /auth/change-password."
+            : "This reset link is invalid or has expired.")
       );
     } finally {
       setLoading(false);

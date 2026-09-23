@@ -509,6 +509,9 @@ select.reason-select{margin-bottom:14px;}
 .header-logout:hover {
   background: #f5f5f5;
 }
+.header-logout{display:inline-flex;align-items:center;gap:7px;color:var(--ink-soft);}
+.header-logout svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.header-logout:hover{border-color:var(--maroon);color:var(--maroon);background:#fdf6f2;}
 
 @media (max-width:520px){
   .role-grid{grid-template-columns:1fr;}

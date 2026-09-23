@@ -26,6 +26,7 @@ export default function AdminDashboard() {
   const [schedule, setSchedule] = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [pendingAppointments, setPendingAppointments] = useState([]);
   const [recordType, setRecordType] = useState(null);
   const [viewingRecord, setViewingRecord] = useState(null);
   const [showAddPatient, setShowAddPatient] = useState(false);
@@ -60,7 +61,9 @@ export default function AdminDashboard() {
           const statsDoctors = getRecordList(statsData, ["doctors", "doctorList", "staff"]);
           if (statsDoctors.length > 0) setDoctors(statsDoctors);
         }
-        if (scheduleResult.status === "fulfilled") setSchedule(scheduleResult.value.data);
+        if (scheduleResult.status === "fulfilled") {
+          setSchedule(getRecordList(scheduleResult.value.data, ["appointments", "schedule", "items", "content", "data"]));
+        }
         if (patientsResult.status === "fulfilled") setPatients(patientsResult.value.data);
         if (doctorsResult.status === "fulfilled") {
           const doctorData = doctorsResult.value.data;
@@ -96,7 +99,10 @@ export default function AdminDashboard() {
       : recordType === "doctors"
         ? doctors
         : recordType === "pending"
-          ? schedule.filter((item) => item.status !== "CONFIRMED")
+          ? (pendingAppointments.length > 0 ? pendingAppointments : schedule).filter((item) => {
+              const status = String(item.status || item.appointmentStatus || item.state || "").toUpperCase();
+              return status !== "CONFIRMED" && status !== "CANCELLED" && status !== "COMPLETED";
+            })
           : schedule;
 
   const recordTitle = {
@@ -109,6 +115,31 @@ export default function AdminDashboard() {
   function closeRecords() {
     setRecordType(null);
     setViewingRecord(null);
+  }
+
+  async function openPendingRecords() {
+    setRecordType("pending");
+    const endpoints = ["/admin/pending-appointments", "/admin/appointments", "/appointments"];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await axiosClient.get(endpoint);
+        const appointmentList = getRecordList(response.data, ["appointments", "pendingAppointments", "items", "content", "data"]);
+        const pendingList = appointmentList.filter((item) => {
+          const status = String(item.status || item.appointmentStatus || item.state || "").toUpperCase();
+          return status !== "CONFIRMED" && status !== "CANCELLED" && status !== "COMPLETED";
+        });
+
+        if (pendingList.length > 0) {
+          setPendingAppointments(pendingList);
+          return;
+        }
+      } catch {
+        // Try the next admin appointment route.
+      }
+    }
+
+    setPendingAppointments([]);
   }
 
   function handlePatientChange(event) {
@@ -174,7 +205,7 @@ export default function AdminDashboard() {
                 <span className="label">Doctors available</span>
               </div>
               <div className="stat">
-                <button className="stat-value-button" type="button" onClick={() => setRecordType("pending")}>
+                <button className="stat-value-button" type="button" onClick={openPendingRecords}>
                   <span className="value">{stats?.pendingAppointments ?? 0}</span>
                 </button>
                 <span className="label">Pending confirmations</span>
@@ -273,7 +304,11 @@ export default function AdminDashboard() {
                 <button className="btn-secondary record-back" type="button" onClick={() => setViewingRecord(null)}>Back to list</button>
               </div>
             ) : records.length === 0 ? (
-              <p>No {recordType} found.</p>
+              <p>
+                {recordType === "pending" && stats?.pendingAppointments > 0
+                  ? `${stats.pendingAppointments} pending confirmation exists, but appointment details were not returned by the backend.`
+                  : `No ${recordType} found.`}
+              </p>
             ) : (
               <div className="record-modal-list">
                 {records.map((record, index) => (

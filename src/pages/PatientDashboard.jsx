@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import axiosClient from "../api/axiosClient";
 import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header.jsx";
@@ -37,6 +38,9 @@ export default function PatientDashboard() {
       <div className="page-head">
         <h1>Welcome, {displayName}</h1>
         <p>Here's a quick look at your care.</p>
+        <Link className="btn-primary" to="/book" style={{ display: "inline-block", marginTop: 18 }}>
+          Book an appointment
+        </Link>
       </div>
 
       <div className="stat-strip">
@@ -48,6 +52,11 @@ export default function PatientDashboard() {
           <span className="value">{loading ? "…" : appointments.length}</span>
           <span className="label">Total visits</span>
         </div>
+      </div>
+
+      <div className="quick-row">
+        <Link className="quick-btn" to="/book">Book an appointment</Link>
+        <Link className="quick-btn" to="/portal">View my care</Link>
       </div>
 
       <div className="table-panel">
