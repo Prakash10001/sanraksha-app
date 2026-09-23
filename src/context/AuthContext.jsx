@@ -18,18 +18,25 @@ export function AuthProvider({ children }) {
       password,
     });
 
-    const { token, fullName, role } = response.data;
+    const account = response.data.user || response.data;
+    const mustResetPassword = Boolean(
+      response.data.mustResetPassword ||
+      response.data.forcePasswordChange ||
+      account.mustResetPassword ||
+      account.forcePasswordChange
+    );
+    const displayName = account.fullName || account.name || email;
 
     // Save JWT
-    sessionStorage.setItem("hms_token", token);
+    sessionStorage.setItem("hms_token", response.data.token);
 
     // Save logged-in user
     const loggedInUser = {
       email,
-      fullName,
-      role,
+      fullName: displayName,
+      role: account.role,
+      mustResetPassword,
     };
-
     localStorage.setItem("user", JSON.stringify(loggedInUser));
     setUser(loggedInUser);
 

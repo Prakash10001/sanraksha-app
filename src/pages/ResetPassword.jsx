@@ -7,6 +7,7 @@ import axiosClient from "../api/axiosClient.js";
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") || "";
+  const firstLogin = searchParams.get("firstLogin") === "true";
   const navigate = useNavigate();
 
   const [password, setPassword] = useState("");
@@ -30,23 +31,31 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      await axiosClient.post("/auth/reset-password", {
-        token,
-        newPassword: password,
-      });
+      if (firstLogin) {
+        await axiosClient.post("/auth/change-password", { newPassword: password });
+        const savedUser = localStorage.getItem("user");
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          localStorage.setItem("user", JSON.stringify({ ...user, mustResetPassword: false }));
+        }
+      } else {
+        await axiosClient.post("/auth/reset-password", { token, newPassword: password });
+      }
       setDone(true);
     } catch (err) {
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
-          "This reset link is invalid or has expired."
+          (firstLogin
+            ? "Unable to change the temporary password. Check that the backend supports /auth/change-password."
+            : "This reset link is invalid or has expired.")
       );
     } finally {
       setLoading(false);
     }
   }
 
-  if (!token) {
+  if (!token && !firstLogin) {
     return (
       <div>
         <Header navLinks={[]} />
@@ -70,8 +79,8 @@ export default function ResetPassword() {
       <div className="page centered" style={{ maxWidth: 420 }}>
         <div className="page-head" style={{ textAlign: "left" }}>
           <Link className="back" to="/login">← Back to sign in</Link>
-          <h1>Choose a new password</h1>
-          <p>Make sure it's at least 8 characters.</p>
+          <h1>{firstLogin ? "Reset your temporary password" : "Choose a new password"}</h1>
+          <p>{firstLogin ? "Choose a new password before continuing." : "Make sure it's at least 8 characters."}</p>
         </div>
 
         {done ? (
@@ -79,8 +88,8 @@ export default function ResetPassword() {
             <p style={{ margin: "0 0 16px", fontSize: 14, color: "var(--ink-soft)" }}>
               Your password has been updated. You can now sign in with your new password.
             </p>
-            <button className="btn-primary" onClick={() => navigate("/login")}>
-              Go to sign in
+            <button className="btn-primary" onClick={() => navigate(firstLogin ? "/patient-dashboard" : "/login")}>
+              {firstLogin ? "Continue" : "Go to sign in"}
             </button>
           </div>
         ) : (
