@@ -23,6 +23,13 @@ const TIME_SLOTS = [
   { label: "2:45 pm", available: true },
 ];
 
+function getToday() {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${today.getFullYear()}-${month}-${day}`;
+}
+
 export default function BookAppointment() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -31,7 +38,7 @@ export default function BookAppointment() {
   const [doctor, setDoctor] = useState("");
   const [loadingDoctors, setLoadingDoctors] = useState(true);
   const [doctorError, setDoctorError] = useState("");
-  const [date, setDate] = useState("2026-09-22");
+  const [date, setDate] = useState(getToday);
   const [time, setTime] = useState("9:45 am");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -166,6 +173,7 @@ export default function BookAppointment() {
           <input
             className="date-input"
             type="date"
+            min={getToday()}
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />

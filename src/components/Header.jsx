@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Logo from "./Logo.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -8,11 +8,18 @@ import { useAuth } from "../context/AuthContext.jsx";
  * user: { initials, name, role } — omit for the public/signed-out header
  * cta: { label, to } — shown instead of a user avatar, e.g. "Sign in"
  */
-export default function Header({ navLinks = [], user = null, cta = null }) {
+export default function Header({ navLinks = [], user = null, cta = null, themeToggle = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? "dark" : "light";
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
+
 
   function handleLogout() {
     logout();
@@ -71,6 +78,19 @@ export default function Header({ navLinks = [], user = null, cta = null }) {
           {cta.label}
         </Link>
       )}
+
+      {themeToggle && (
+        <button
+          type="button"
+          className="theme-toggle"
+          aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          onClick={() => setDarkMode((value) => !value)}
+        >
+          {darkMode ? "☀" : "☾"}
+        </button>
+      )}
+
     </header>
   );
 }

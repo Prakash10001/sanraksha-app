@@ -20,6 +20,35 @@ function getRecordList(data, keys = []) {
   return [];
 }
 
+function findNestedValue(record, fieldNames) {
+  if (!record || typeof record !== "object") return "";
+  for (const [key, value] of Object.entries(record)) {
+    if (fieldNames.includes(key.toLowerCase()) && value != null && value !== "") return value;
+  }
+  for (const value of Object.values(record)) {
+    if (value && typeof value === "object") {
+      const nestedValue = findNestedValue(value, fieldNames);
+      if (nestedValue) return nestedValue;
+    }
+  }
+  return "";
+}
+
+function normalizePatientRecord(record) {
+  const patient = record.patient || record;
+  const user = patient.user || record.user || {};
+  const profile = patient.profile || record.profile || {};
+
+  return {
+    ...record,
+    name: record.name || record.fullName || patient.fullName || user.fullName || user.name || "—",
+    patientCode: record.patientCode || patient.patientCode || patient.patientId || record.patientId,
+    email: findNestedValue(record, ["email", "emailaddress", "patientemail", "emailid"]),
+    gender: findNestedValue(record, ["gender", "sex", "patientgender"]),
+    registeredOn: record.registeredOn || record.createdAt || patient.createdAt || user.createdAt || "",
+  };
+}
+
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
@@ -30,9 +59,13 @@ export default function AdminDashboard() {
   const [recordType, setRecordType] = useState(null);
   const [viewingRecord, setViewingRecord] = useState(null);
   const [showAddPatient, setShowAddPatient] = useState(false);
+  const [showAddDoctor, setShowAddDoctor] = useState(false);
   const [patientForm, setPatientForm] = useState({ fullName: "", email: "", password: "", gender: "" });
+  const [doctorForm, setDoctorForm] = useState({ fullName: "", email: "", password: "", specialization: "" });
   const [patientError, setPatientError] = useState("");
+  const [doctorError, setDoctorError] = useState("");
   const [patientSaving, setPatientSaving] = useState(false);
+  const [doctorSaving, setDoctorSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentHour, setCurrentHour] = useState(() => new Date().getHours());
 
@@ -64,7 +97,9 @@ export default function AdminDashboard() {
         if (scheduleResult.status === "fulfilled") {
           setSchedule(getRecordList(scheduleResult.value.data, ["appointments", "schedule", "items", "content", "data"]));
         }
-        if (patientsResult.status === "fulfilled") setPatients(patientsResult.value.data);
+        if (patientsResult.status === "fulfilled") {
+          setPatients(getRecordList(patientsResult.value.data, ["patients", "items", "content", "data"]).map(normalizePatientRecord));
+        }
         if (doctorsResult.status === "fulfilled") {
           const doctorData = doctorsResult.value.data;
           setDoctors(getRecordList(doctorData, ["doctors", "doctorList", "staff", "users", "items", "content", "data"]));
@@ -146,6 +181,10 @@ export default function AdminDashboard() {
     setPatientForm({ ...patientForm, [event.target.name]: event.target.value });
   }
 
+  function handleDoctorChange(event) {
+    setDoctorForm({ ...doctorForm, [event.target.name]: event.target.value });
+  }
+
   async function handleAddPatient(event) {
     event.preventDefault();
     setPatientError("");
@@ -155,16 +194,50 @@ export default function AdminDashboard() {
       await axiosClient.post("/auth/register", {
         ...patientForm,
         role: "PATIENT",
+        userRole: "PATIENT",
+        accountRole: "PATIENT",
         mustResetPassword: true,
       });
       const patientsResponse = await axiosClient.get("/admin/recent-patients");
-      setPatients(patientsResponse.data);
+      setPatients(getRecordList(patientsResponse.data, ["patients", "items", "content", "data"]).map(normalizePatientRecord));
       setPatientForm({ fullName: "", email: "", password: "", gender: "" });
       setShowAddPatient(false);
     } catch (error) {
       setPatientError(error?.response?.data?.error || "Unable to add patient.");
     } finally {
       setPatientSaving(false);
+    }
+  }
+
+  async function handleAddDoctor(event) {
+    event.preventDefault();
+    setDoctorError("");
+    setDoctorSaving(true);
+
+    try {
+      await axiosClient.post("/auth/register", {
+        ...doctorForm,
+        role: "DOCTOR",
+        userRole: "DOCTOR",
+        accountRole: "DOCTOR",
+        mustResetPassword: true,
+      });
+
+      const doctorsResponse = await axiosClient.get("/doctors").catch(() => axiosClient.get("/admin/recent-doctors")).catch(() => axiosClient.get("/admin/staff"));
+      const doctorData = doctorsResponse.data;
+      setDoctors(getRecordList(doctorData, ["doctors", "doctorList", "staff", "users", "items", "content", "data"]));
+
+      const statsResponse = await axiosClient.get("/admin/stats").catch(() => null);
+      if (statsResponse?.data) {
+        setStats(statsResponse.data);
+      }
+
+      setDoctorForm({ fullName: "", email: "", password: "", specialization: "" });
+      setShowAddDoctor(false);
+    } catch (error) {
+      setDoctorError(error?.response?.data?.error || "Unable to add doctor.");
+    } finally {
+      setDoctorSaving(false);
     }
   }
 
@@ -236,6 +309,7 @@ export default function AdminDashboard() {
               <div className="panel actions-panel">
                 <h2>Quick actions</h2>
                 <button className="action-btn" type="button" onClick={() => setShowAddPatient(true)}>Add new patient</button>
+                <button className="action-btn" type="button" onClick={() => setShowAddDoctor(true)}>Add new doctor</button>
                 <button className="action-btn">Book appointment</button>
                 <button className="action-btn">View staff roster</button>
                 <button className="action-btn">Generate a bill</button>
@@ -246,15 +320,22 @@ export default function AdminDashboard() {
               <h2>Recent patients</h2>
               <table>
                 <thead>
-                  <tr><th>Name</th><th>Patient ID</th><th>Gender</th><th>Registered On</th></tr>
+                  <tr>
+                    <th>Name</th>
+                    <th>Doctor</th>
+                    <th>Patient ID</th>
+                    <th>Gender</th>
+                    <th>Registered On</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {patients.map((p) => (
-                    <tr key={p.patientCode}>
-                      <td>{p.name}</td>
-                      <td>{p.patientCode}</td>
+                    <tr key={p.patientCode || p.id || p.email}>
+                      <td>{p.name || p.fullName || p.user?.fullName || "—"}</td>
+                      <td>{p.doctorName || p.doctor?.fullName || p.doctor?.user?.fullName || p.assignedDoctor || "—"}</td>
+                      <td>{p.patientCode || p.id || "—"}</td>
                       <td>{p.gender || "—"}</td>
-                      <td>{p.registeredOn}</td>
+                      <td>{p.registeredOn || p.createdAt || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -275,11 +356,11 @@ export default function AdminDashboard() {
               <div className="record-details">
                 {recordType === "patients" && (
                   <>
-                    <div className="record-detail-row"><span>Name</span><strong>{viewingRecord.name || viewingRecord.fullName || "-"}</strong></div>
+                    <div className="record-detail-row"><span>Name</span><strong>{viewingRecord.name || viewingRecord.fullName || viewingRecord.user?.fullName || "-"}</strong></div>
                     <div className="record-detail-row"><span>Patient ID</span><strong>{viewingRecord.patientCode || "-"}</strong></div>
                     <div className="record-detail-row"><span>Gender</span><strong>{viewingRecord.gender || "-"}</strong></div>
-                    <div className="record-detail-row"><span>Email</span><strong>{viewingRecord.email || viewingRecord.user?.email || "-"}</strong></div>
-                    <div className="record-detail-row"><span>Registered On</span><strong>{viewingRecord.registeredOn || viewingRecord.user?.createdAt || "-"}</strong></div>
+                    <div className="record-detail-row"><span>Email</span><strong>{viewingRecord.email || viewingRecord.user?.email || viewingRecord.patient?.email || viewingRecord.patient?.user?.email || "-"}</strong></div>
+                    <div className="record-detail-row"><span>Registered On</span><strong>{viewingRecord.registeredOn || viewingRecord.createdAt || viewingRecord.user?.createdAt || "-"}</strong></div>
                   </>
                 )}
                 {recordType === "doctors" && (
@@ -356,6 +437,35 @@ export default function AdminDashboard() {
 
               <button className="confirm-btn" type="submit" disabled={patientSaving}>
                 {patientSaving ? "Adding patient..." : "Add patient"}
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {showAddDoctor && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setShowAddDoctor(false)}>
+          <section className="record-modal" role="dialog" aria-modal="true" aria-labelledby="add-doctor-title" onClick={(event) => event.stopPropagation()}>
+            <div className="record-modal-head">
+              <h2 id="add-doctor-title">Add new doctor</h2>
+              <button className="modal-close" type="button" aria-label="Close add doctor form" onClick={() => setShowAddDoctor(false)}>×</button>
+            </div>
+            {doctorError && <div className="auth-error" role="alert">{doctorError}</div>}
+            <form className="record-form" onSubmit={handleAddDoctor}>
+              <label htmlFor="doctor-full-name">Full name</label>
+              <input id="doctor-full-name" name="fullName" value={doctorForm.fullName} onChange={handleDoctorChange} required />
+
+              <label htmlFor="doctor-email">Email</label>
+              <input id="doctor-email" type="email" name="email" value={doctorForm.email} onChange={handleDoctorChange} required />
+
+              <label htmlFor="doctor-password">Temporary password</label>
+              <input id="doctor-password" type="password" name="password" value={doctorForm.password} onChange={handleDoctorChange} minLength={6} required />
+
+              <label htmlFor="doctor-specialization">Specialization</label>
+              <input id="doctor-specialization" name="specialization" value={doctorForm.specialization} onChange={handleDoctorChange} placeholder="e.g. Cardiology" required />
+
+              <button className="confirm-btn" type="submit" disabled={doctorSaving}>
+                {doctorSaving ? "Adding doctor..." : "Add doctor"}
               </button>
             </form>
           </section>
