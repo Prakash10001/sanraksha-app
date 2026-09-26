@@ -21,6 +21,7 @@ const TIME_SLOTS = [
   { label: "11:15 am", available: false },
   { label: "2:00 pm", available: true },
   { label: "2:45 pm", available: true },
+  { label: "22:45 pm", available: true },
 ];
 
 function getToday() {

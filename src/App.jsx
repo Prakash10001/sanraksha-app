@@ -11,6 +11,7 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
+import CompleteProfile from "./pages/CompleteProfile.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       <Route element={<ProtectedRoute allowedRoles={["PATIENT"]} />}>
+        <Route path="/complete-profile" element={<CompleteProfile />} />
         <Route path="/patient-dashboard" element={<PatientDashboard />} />
         <Route path="/portal" element={<PatientPortal />} />
         <Route path="/book" element={<BookAppointment />} />
