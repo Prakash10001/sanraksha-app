@@ -11,22 +11,32 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/patient-dashboard" element={<PatientDashboard />} />
-      <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
-      <Route path="/admin-dashboard" element={<AdminDashboard />} />
-      <Route path="/portal" element={<PatientPortal />} />
-      <Route path="/book" element={<BookAppointment />} />
-      <Route path="/book/confirmed" element={<AppointmentConfirmed />} />
-      <Route path="/manage" element={<ManageAppointment />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+
+      <Route element={<ProtectedRoute allowedRoles={["PATIENT"]} />}>
+        <Route path="/patient-dashboard" element={<PatientDashboard />} />
+        <Route path="/portal" element={<PatientPortal />} />
+        <Route path="/book" element={<BookAppointment />} />
+        <Route path="/book/confirmed" element={<AppointmentConfirmed />} />
+        <Route path="/manage" element={<ManageAppointment />} />
+      </Route>
+
+      <Route element={<ProtectedRoute allowedRoles={["DOCTOR"]} />}>
+        <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
+      </Route>
+
+      <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+      </Route>
     </Routes>
   );
 }

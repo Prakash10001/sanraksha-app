@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import AppFooter from "../components/AppFooter.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const PATIENT_NAV = [
   { label: "My care", to: "/portal" },
@@ -10,6 +11,7 @@ const PATIENT_NAV = [
 ];
 
 export default function AppointmentConfirmed() {
+  const { user } = useAuth();
   const { state } = useLocation();
   const details = state || {
     department: "Cardiology",
@@ -18,12 +20,19 @@ export default function AppointmentConfirmed() {
     time: "9:45 am",
     reason: "Follow-up on blood pressure medication",
   };
+  const displayName = user?.fullName || user?.name || user?.email || "Patient";
+  const initials = displayName
+    .split(" ")
+    .map((namePart) => namePart[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div>
       <Header
         navLinks={PATIENT_NAV}
-        user={{ initials: "AS", name: "Anita Sharma", role: "Patient" }}
+        user={{ initials, name: displayName, role: "Patient" }}
       />
 
       <div className="page centered">

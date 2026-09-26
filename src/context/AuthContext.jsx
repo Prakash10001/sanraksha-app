@@ -5,8 +5,14 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("user");
-    return savedUser ? JSON.parse(savedUser) : null;
+    const savedUser = sessionStorage.getItem("user");
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (!parsedUser) return null;
+
+    return {
+      ...parsedUser,
+      role: String(parsedUser.role || parsedUser.userRole || parsedUser.accountRole || "PATIENT").toUpperCase(),
+    };
   });
 
   // ================================
@@ -19,6 +25,7 @@ export function AuthProvider({ children }) {
     });
 
     const account = response.data.user || response.data;
+    const normalizedRole = String(account.role || account.userRole || account.accountRole || "PATIENT").toUpperCase();
     const mustResetPassword = Boolean(
       response.data.mustResetPassword ||
       response.data.forcePasswordChange ||
@@ -32,12 +39,14 @@ export function AuthProvider({ children }) {
 
     // Save logged-in user
     const loggedInUser = {
+      id: account.id || account.userId || account.doctorId || null,
+      username: account.username || account.userName || "",
       email,
       fullName: displayName,
-      role: account.role,
+      role: normalizedRole,
       mustResetPassword,
     };
-    localStorage.setItem("user", JSON.stringify(loggedInUser));
+    sessionStorage.setItem("user", JSON.stringify(loggedInUser));
     setUser(loggedInUser);
 
     return response.data;
@@ -47,7 +56,15 @@ export function AuthProvider({ children }) {
   // REGISTER
   // ================================
   const register = async (form) => {
-    const response = await axiosClient.post("/auth/register", form);
+    const normalizedRole = String(form?.role || "PATIENT").toUpperCase();
+    const payload = {
+      ...form,
+      role: normalizedRole,
+      userRole: normalizedRole,
+      accountRole: normalizedRole,
+    };
+
+    const response = await axiosClient.post("/auth/register", payload);
 
     return response.data;
   };
@@ -57,6 +74,7 @@ export function AuthProvider({ children }) {
   // ================================
   const logout = () => {
     sessionStorage.removeItem("hms_token");
+    sessionStorage.removeItem("user");
     localStorage.removeItem("user");
     setUser(null);
   };

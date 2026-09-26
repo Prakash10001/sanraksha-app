@@ -33,10 +33,10 @@ export default function ResetPassword() {
     try {
       if (firstLogin) {
         await axiosClient.post("/auth/change-password", { newPassword: password });
-        const savedUser = localStorage.getItem("user");
+        const savedUser = sessionStorage.getItem("user");
         if (savedUser) {
           const user = JSON.parse(savedUser);
-          localStorage.setItem("user", JSON.stringify({ ...user, mustResetPassword: false }));
+          sessionStorage.setItem("user", JSON.stringify({ ...user, mustResetPassword: false }));
         }
       } else {
         await axiosClient.post("/auth/reset-password", { token, newPassword: password });

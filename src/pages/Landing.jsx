@@ -31,7 +31,7 @@ const FEATURES = [
 export default function Landing() {
   return (
     <div>
-      <Header navLinks={PUBLIC_NAV} cta={{ label: "Sign in", to: "/login" }} />
+      <Header navLinks={PUBLIC_NAV} themeToggle />
       <section className="hero">
         <div className="hero-text">
           <h1>Every patient record, every shift, every bill — looked after in one place.</h1>
@@ -41,9 +41,9 @@ export default function Landing() {
             cracks between departments.
           </p>
           <div className="hero-actions">
-           <a className="btn-primary" href="/dashboard">See a demo</a>
-           {/* <a className="btn-secondary" href="/portal">Sign in</a>
-             ADD SIGN UP HERE */} 
+          {/* <a className="btn-primary" href="/dashboard">See a demo</a> */}
+            <a className="btn-secondary" href="/login">Sign in</a>
+             
             <a className="btn-secondary" href="/register"> Register </a>
           </div>
         </div>

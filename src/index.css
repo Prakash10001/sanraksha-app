@@ -12,6 +12,15 @@
   --ink-soft:#5c534c;
   --line:#e7ddd0;
 }
+[data-theme="dark"]{
+  --cream:#2c2521;
+  --ink:#f8efe7;
+  --ink-soft:#cbbeb4;
+  --line:#4b3e37;
+  --maroon-dark:#160f0d;
+  --maroon:#b95050;
+  --maroon-light:#d47777;
+}
 *{box-sizing:border-box;}
 body{
   margin:0;
@@ -19,6 +28,7 @@ body{
   color:var(--ink);
   background:#faf7f3;
 }
+[data-theme="dark"] body{background:#1c1715;color:var(--ink);}
 a{color:inherit;text-decoration:none;}
 button{font-family:inherit;}
 
@@ -27,6 +37,7 @@ header{
   display:flex;align-items:center;justify-content:space-between;
   padding:16px 40px;border-bottom:3px solid var(--gold);background:#fffdfb;
 }
+[data-theme="dark"] header{background:#241d19;}
 .brand{display:flex;align-items:center;gap:12px;}
 .brand svg{width:32px;height:38px;flex-shrink:0;}
 .brand-text{
@@ -48,6 +59,8 @@ nav a:hover{color:var(--maroon);}
 .menu-toggle span{display:block;width:24px;height:2px;background:var(--ink);margin:5px 0;}
 .header-cta{background:var(--maroon);color:#fff;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;}
 .header-cta:hover{background:var(--maroon-dark);}
+.theme-toggle{width:38px;height:38px;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--ink);font-size:20px;line-height:1;cursor:pointer;}
+.theme-toggle:hover{border-color:var(--maroon);color:var(--maroon);background:var(--cream);}
 
 /* ---- landing page ---- */
 .hero{display:flex;align-items:center;gap:60px;max-width:1120px;margin:0 auto;padding:72px 40px 80px;}
@@ -62,6 +75,7 @@ nav a:hover{color:var(--maroon);}
 .btn-secondary:hover{border-color:var(--maroon);}
 .hero-visual{flex:0.9;display:flex;align-items:center;justify-content:center;background:var(--cream);border-radius:16px;padding:40px;}
 .hero-visual svg{width:180px;height:auto;}
+[data-theme="dark"] .hero-visual{background:#322721;}
 
 .features{max-width:1120px;margin:0 auto;padding:20px 40px 80px;}
 .features h2{font-family:Georgia,serif;font-size:28px;font-weight:700;margin:0 0 8px;max-width:480px;}
@@ -144,6 +158,21 @@ tbody tr:hover{background:#fbf6f0;}
 .status-dot::before{content:"";width:7px;height:7px;border-radius:50%;background:#3f9463;}
 .status-dot.observation::before{background:var(--gold);}
 .status-dot.discharged::before{background:#9a9088;}
+.status-dot.pending::before{background:var(--gold);}
+.status-dot.confirmed::before{background:#2e6b46;}
+.status-dot.cancelled::before{background:var(--danger);}
+.status-dot.completed::before{background:#5980c1;}
+
+.doctor-queue{display:flex;flex-direction:column;gap:24px;}
+.patient-name-block,
+.patient-meta-block{display:flex;flex-direction:column;gap:4px;}
+.patient-name-block strong{font-size:14px;}
+.patient-name-block span,
+.patient-meta-block span{font-size:12px;color:var(--ink-soft);}
+.doctor-confirm-btn{background:var(--maroon);color:#fff;border:none;border-radius:6px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;}
+.doctor-confirm-btn:hover{background:var(--maroon-dark);}
+.doctor-confirm-btn:disabled{opacity:0.65;cursor:wait;}
+.doctor-confirmed-label{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;background:var(--green-bg);color:var(--green);font-size:12px;font-weight:700;}
 
 .modal-backdrop{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(38,32,28,0.45);}
 .record-modal{width:min(560px,100%);max-height:80vh;overflow:auto;background:#fffdfb;border:1px solid var(--line);border-radius:12px;padding:24px;box-shadow:0 18px 50px rgba(38,32,28,0.2);}
@@ -192,6 +221,54 @@ tbody tr:hover{background:#fbf6f0;}
 .billing-row{display:flex;justify-content:space-between;align-items:center;}
 .billing-amount .value{font-family:Georgia,serif;font-size:26px;font-weight:700;color:var(--maroon);display:block;}
 .billing-amount .label{font-size:13px;color:var(--ink-soft);}
+.patient-summary{flex:0 0 300px;}
+.patient-summary .detail-row{font-size:13px;}
+
+.portal-appointment-carousel{margin-bottom:32px;padding:20px 26px 26px;border:1px solid var(--maroon-dark);border-left:6px solid var(--gold);border-radius:12px;background:var(--maroon-dark);color:#fdf6ef;box-shadow:0 12px 28px rgba(38,32,28,.12);}
+.portal-carousel-topline{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;color:#e0c9bd;font-size:11px;font-weight:700;letter-spacing:1px;}
+.portal-carousel-count{display:inline-flex;align-items:center;gap:8px;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:0;}
+.portal-carousel-count i{color:var(--gold);font-style:normal;}
+.portal-carousel-content{display:grid;grid-template-columns:124px minmax(0,1fr);align-items:center;gap:26px;min-height:196px;animation:portal-slide-in .24s ease-out;}
+.portal-date-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;aspect-ratio:1/1;max-width:124px;border-top:4px solid var(--gold);border-radius:8px;background:#fffdfb;color:var(--maroon-dark);box-shadow:0 8px 22px rgba(0,0,0,.14);}
+.portal-date-tile span{font-size:12px;font-weight:700;letter-spacing:1px;color:var(--maroon);}
+.portal-date-tile strong{font-family:Georgia,serif;font-size:48px;line-height:1.1;font-weight:700;font-variant-numeric:tabular-nums;}
+.portal-date-tile small{margin-top:5px;color:var(--ink-soft);font-size:10px;font-weight:700;letter-spacing:1.5px;}
+.portal-appointment-copy{min-width:0;}
+.portal-appointment-status{display:inline-flex;align-items:center;min-height:25px;margin-bottom:8px;padding:4px 10px;border-radius:20px;background:#faf1de;color:#825b17;font-size:10px;font-weight:800;letter-spacing:.7px;}
+.portal-appointment-status.confirmed,.portal-appointment-status.completed{background:#e7f2ea;color:#2e6b46;}
+.portal-appointment-status.cancelled{background:#f7e9e5;color:#8b3025;}
+.portal-appointment-copy h2{margin:0 0 6px;color:#fff;font-family:Georgia,serif;font-size:24px;line-height:1.2;overflow-wrap:anywhere;}
+.portal-appointment-date{margin:0 0 5px;color:#f2e5dc;font-size:14px;line-height:1.5;}
+.portal-appointment-reason{margin:0;color:#d7c3b7;font-size:13px;line-height:1.5;}
+.portal-carousel-actions{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:18px;}
+.portal-carousel-book{display:inline-flex;align-items:center;min-height:38px;padding:9px 14px;border:1px solid rgba(255,255,255,.42);border-radius:6px;color:#fffdfb;font-size:13px;font-weight:700;transition:background .18s ease,color .18s ease,border-color .18s ease;}
+.portal-carousel-book:hover{border-color:var(--gold);background:var(--gold);color:var(--maroon-dark);}
+.portal-carousel-controls{display:flex;gap:8px;}
+.portal-carousel-controls button{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid rgba(255,255,255,.42);border-radius:50%;background:transparent;color:#fff;font-size:27px;line-height:1;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease;}
+.portal-carousel-controls button:hover:not(:disabled){border-color:var(--gold);background:var(--gold);color:var(--maroon-dark);}
+.portal-carousel-controls button:disabled{opacity:.35;cursor:not-allowed;}
+.portal-carousel-dots{display:flex;gap:7px;margin-top:14px;}
+.portal-carousel-dots button{width:7px;height:7px;padding:0;border:0;border-radius:50%;background:#9d7770;cursor:pointer;transition:width .18s ease,background .18s ease;}
+.portal-carousel-dots button.active{width:22px;border-radius:8px;background:var(--gold);}
+.portal-carousel-empty{display:flex;align-items:center;gap:18px;min-height:150px;}
+.portal-carousel-empty h2{margin:0 0 5px;color:#fff;font-family:Georgia,serif;font-size:21px;}
+.portal-carousel-empty p{margin:0;color:#d7c3b7;font-size:13px;line-height:1.5;}
+.portal-empty-mark{display:flex;align-items:center;justify-content:center;width:52px;height:52px;flex:none;border:1px solid rgba(255,255,255,.35);border-radius:50%;color:var(--gold);font-size:30px;font-weight:300;}
+@keyframes portal-slide-in{from{opacity:.55;transform:translateX(8px);}to{opacity:1;transform:translateX(0);}}
+
+@media (max-width:640px){
+  .portal-appointment-carousel{padding:17px 17px 20px;}
+  .portal-carousel-content{grid-template-columns:76px minmax(0,1fr);align-items:start;gap:15px;min-height:0;}
+  .portal-date-tile{width:76px;min-height:88px;aspect-ratio:auto;}
+  .portal-date-tile strong{font-size:34px;}
+  .portal-date-tile span{font-size:10px;}
+  .portal-date-tile small{font-size:9px;}
+  .portal-appointment-copy h2{font-size:20px;}
+  .portal-appointment-date{font-size:13px;}
+  .portal-carousel-actions{align-items:flex-start;}
+  .portal-carousel-book{max-width:calc(100% - 92px);font-size:12px;}
+  .portal-carousel-empty{flex-wrap:wrap;}
+}
 
 /* booking / manage appointment */
 .step{margin-bottom:34px;}
