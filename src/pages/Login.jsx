@@ -4,6 +4,7 @@ import Header from "../components/Header.jsx";
 import SiteFooter from "../components/SiteFooter.jsx";
 import AuthTabs from "../components/AuthTabs.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import axiosClient from "../api/axiosClient.js";
 
 export default function Login() {
   const { login } = useAuth();
@@ -20,6 +21,7 @@ export default function Login() {
     try {
       const data = await login(email, password);
       const account = data.user || data;
+      const normalizedRole = String(account.role || account.userRole || account.accountRole || "PATIENT").toUpperCase();
       const mustResetPassword = Boolean(
         data.mustResetPassword ||
         data.forcePasswordChange ||
@@ -27,9 +29,20 @@ export default function Login() {
         account.forcePasswordChange
       );
       if (mustResetPassword) navigate("/reset-password?firstLogin=true");
-      else if (account.role === "DOCTOR") navigate("/doctor-dashboard");
-      else if (account.role === "ADMIN") navigate("/admin-dashboard");
-      else navigate("/patient-dashboard");
+      else if (normalizedRole === "DOCTOR") navigate("/doctor-dashboard");
+      else if (normalizedRole === "ADMIN") navigate("/admin-dashboard");
+      else {
+        try {
+          const profileResponse = await axiosClient.get("/patients/me");
+          const profile = profileResponse.data?.patient || profileResponse.data?.data || profileResponse.data || {};
+          const hasRequiredProfile = ["phone", "gender", "dateOfBirth", "bloodGroup", "address"]
+            .every((field) => String(profile[field] || "").trim());
+          navigate(hasRequiredProfile ? "/patient-dashboard" : "/complete-profile");
+        } catch (profileError) {
+          if (profileError?.response?.status === 404) navigate("/complete-profile");
+          else navigate("/patient-dashboard");
+        }
+      }
     } catch (err) {
       setError(
         err?.response?.data?.message ||

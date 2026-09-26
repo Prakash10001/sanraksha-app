@@ -107,7 +107,10 @@ export default function PatientPortal() {
                 <p className="portal-appointment-date">{dateParts.full}</p>
                 <p className="portal-appointment-reason">{selectedAppointment.reason || selectedAppointment.notes || "General consultation"}</p>
                 <div className="portal-carousel-actions">
-                  <Link className="portal-carousel-book" to="/book">Book another appointment</Link>
+                  <div className="portal-carousel-links">
+                    {appointmentStatus !== "CANCELLED" && <Link className="portal-carousel-book" to="/manage">Reschedule</Link>}
+                    <Link className="portal-carousel-book" to="/book">Book another appointment</Link>
+                  </div>
                   <div className="portal-carousel-controls" aria-label="Appointment navigation">
                     <button type="button" aria-label="Previous appointment" title="Previous appointment" disabled={selectedAppointmentIndex === 0} onClick={() => setSelectedAppointmentIndex((index) => Math.max(index - 1, 0))}>
                       <span aria-hidden="true">‹</span>

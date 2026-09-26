@@ -24,6 +24,7 @@ function readCancelledAppointment() {
 export default function PatientDashboard() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState([]);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const displayName = user?.fullName || user?.name || user?.email || "Patient";
@@ -35,10 +36,23 @@ export default function PatientDashboard() {
     .toUpperCase();
 
   useEffect(() => {
-    axiosClient
-      .get("/appointments/me")
-      .then((res) => setAppointments(res.data))
-      .catch(() => setAppointments([]))
+    Promise.allSettled([
+      axiosClient.get("/appointments/me"),
+      axiosClient.get("/patients/me"),
+    ])
+      .then(([appointmentsResult, profileResult]) => {
+        if (appointmentsResult.status === "fulfilled") {
+          const data = appointmentsResult.value.data;
+          setAppointments(Array.isArray(data) ? data : data.appointments || data.items || data.content || data.data || []);
+        } else {
+          setAppointments([]);
+        }
+
+        if (profileResult.status === "fulfilled") {
+          const data = profileResult.value.data;
+          setProfile(data?.patient || data?.data || data);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -100,9 +114,23 @@ export default function PatientDashboard() {
           </div>
 
           <div className="panel patient-summary">
-            <h2>My profile</h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+              <h2>My profile</h2>
+              <Link className="profile-edit-link" to="/complete-profile" aria-label="Edit patient details" title="Edit patient details">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+                <span>Edit details</span>
+              </Link>
+            </div>
             <div className="detail-row"><span>Full name</span><span>{displayName}</span></div>
             <div className="detail-row"><span>Email</span><span>{user?.email || "-"}</span></div>
+            <div className="detail-row"><span>Phone</span><span>{profile?.phone || "-"}</span></div>
+            <div className="detail-row"><span>Gender</span><span>{profile?.gender || "-"}</span></div>
+            <div className="detail-row"><span>Date of birth</span><span>{profile?.dateOfBirth || "-"}</span></div>
+            <div className="detail-row"><span>Blood group</span><span>{profile?.bloodGroup || "-"}</span></div>
+            <div className="detail-row"><span>Address</span><span>{profile?.address || "-"}</span></div>
             <div className="detail-row"><span>Role</span><span>Patient</span></div>
           </div>
         </div>

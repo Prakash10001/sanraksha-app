@@ -22,6 +22,25 @@ const TIME_SLOTS = [
 
 const CANCEL_REASONS = ["Schedule conflict", "Feeling better", "Finding another doctor", "Other"];
 
+function getToday() {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${today.getFullYear()}-${month}-${day}`;
+}
+
+function getApiErrorMessage(error, fallback) {
+  const responseData = error?.response?.data;
+  if (typeof responseData === "string" && responseData.trim()) return responseData;
+  if (responseData?.message) return responseData.message;
+  if (responseData?.error) return responseData.error;
+  if (responseData && typeof responseData === "object") {
+    const fieldErrors = Object.values(responseData).filter((value) => typeof value === "string");
+    if (fieldErrors.length) return fieldErrors.join(" ");
+  }
+  return fallback;
+}
+
 const defaultAppointment = {
   id: null,
   reference: "—",
@@ -42,6 +61,7 @@ function normalizeAppointment(item) {
     location: item.location || item.clinic || "Hospital clinic",
     status: String(item.status || item.appointmentStatus || item.state || "SCHEDULED").toUpperCase(),
     reason: item.reason || "General consultation",
+    appointmentDate: item.appointmentDate || item.date || "",
   };
 }
 
@@ -50,11 +70,12 @@ export default function ManageAppointment() {
   const { user } = useAuth();
   const [appointment, setAppointment] = useState(defaultAppointment);
   const [view, setView] = useState("main");
-  const [newDate, setNewDate] = useState("2026-09-24");
+  const [newDate, setNewDate] = useState(getToday);
   const [selectedTime, setSelectedTime] = useState("10:30 am");
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
   const [cancelNote, setCancelNote] = useState("");
   const [loading, setLoading] = useState(true);
+  const [rescheduling, setRescheduling] = useState(false);
   const [error, setError] = useState("");
 
   const displayName = user?.fullName || user?.name || user?.email || "Patient";
@@ -76,7 +97,13 @@ export default function ManageAppointment() {
         const activeAppointment = list.find((item) => String(item.status || item.appointmentStatus || item.state || "").toUpperCase() !== "CANCELLED");
 
         if (!ignore) {
-          setAppointment(activeAppointment ? normalizeAppointment(activeAppointment) : { ...defaultAppointment, status: "CANCELLED" });
+          if (activeAppointment) {
+            const normalized = normalizeAppointment(activeAppointment);
+            setAppointment(normalized);
+            if (normalized.appointmentDate) setNewDate(normalized.appointmentDate.slice(0, 10));
+          } else {
+            setAppointment({ ...defaultAppointment, status: "CANCELLED" });
+          }
         }
       })
       .catch(() => {
@@ -119,6 +146,40 @@ export default function ManageAppointment() {
 
     setAppointment((current) => ({ ...current, status: "CANCELLED" }));
     setView("cancelled");
+  }
+
+  async function handleRescheduleConfirm() {
+    if (!appointment.id || !newDate) {
+      setError("Choose a valid date and time before confirming.");
+      return;
+    }
+
+    const [timeValue, meridiem] = selectedTime.split(" ");
+    let [hours, minutes] = timeValue.split(":").map(Number);
+    if (meridiem === "pm" && hours !== 12) hours += 12;
+    if (meridiem === "am" && hours === 12) hours = 0;
+    const appointmentDate = `${newDate}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`;
+
+    if (new Date(appointmentDate) <= new Date()) {
+      setError("Choose a future date and time for the appointment.");
+      return;
+    }
+
+    setError("");
+    setRescheduling(true);
+    try {
+      await axiosClient.patch(`/appointments/${appointment.id}/reschedule`, { appointmentDate });
+      setAppointment((current) => ({
+        ...current,
+        appointmentDate,
+        dateTime: new Date(appointmentDate).toLocaleString(),
+      }));
+      setView("rescheduled");
+    } catch (rescheduleError) {
+      setError(getApiErrorMessage(rescheduleError, "Unable to reschedule this appointment."));
+    } finally {
+      setRescheduling(false);
+    }
   }
 
   const isCancelled = String(appointment.status || "").toUpperCase() === "CANCELLED";
@@ -177,9 +238,11 @@ export default function ManageAppointment() {
           <div className="panel" style={{ marginTop: 24 }}>
             <h2>Choose a new time</h2>
             <div className="step-label">With {appointment.doctor} · {appointment.department}</div>
+            {error && <div className="auth-error" role="alert">{error}</div>}
             <input
               className="date-input"
               type="date"
+              min={getToday()}
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
             />
@@ -197,8 +260,8 @@ export default function ManageAppointment() {
               ))}
             </div>
             <div className="panel-actions">
-              <button className="btn-primary" style={{ flex: "none" }} onClick={() => setView("rescheduled")}>
-                Confirm new time
+              <button className="btn-primary" style={{ flex: "none" }} onClick={handleRescheduleConfirm} disabled={rescheduling}>
+                {rescheduling ? "Saving..." : "Confirm new time"}
               </button>
               <button className="btn-text" onClick={() => setView("main")}>Never mind</button>
             </div>
@@ -247,7 +310,7 @@ export default function ManageAppointment() {
             </div>
             <h2 style={{ fontFamily: "Georgia, serif", fontSize: 20, margin: "0 0 8px" }}>Appointment rescheduled</h2>
             <p style={{ color: "var(--ink-soft)" }}>
-              Your visit with {appointment.doctor} is now set for {newDate}, {selectedTime}. A confirmation has been sent to you.
+              Your visit with {appointment.doctor} is now set for {appointment.dateTime}.
             </p>
             <div className="panel-actions" style={{ justifyContent: "center", marginTop: 24 }}>
               <button className="btn-primary" type="button" onClick={() => navigate("/portal")}>Back to main page</button>
