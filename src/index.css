@@ -1,3 +1,4 @@
+.role-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
 :root{
   --maroon-dark:#6e2020;
   --maroon:#8a2a2a;
@@ -550,6 +551,28 @@ select.reason-select{margin-bottom:14px;}
 .choice-radio{width:13px;height:13px;border:1px solid #cbbeb1;border-radius:50%;background:#fff;flex-shrink:0;}
 .choice-pill.selected .choice-radio{border:4px solid var(--maroon);}
 
+.approval-badge{display:inline-flex;align-items:center;align-self:flex-start;margin-left:auto;padding:7px 10px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff8f1;font-size:11px;font-weight:700;text-transform:uppercase;white-space:nowrap;}
+.approval-approved{background:rgba(46,107,70,.5);}
+.approval-pending_review{background:rgba(154,106,26,.42);}
+.approval-rejected{background:rgba(161,58,42,.48);}
+.approval-message h2{font-family:Georgia,serif;font-size:22px;margin:0 0 8px;}
+.approval-message p,.verification-intro{color:var(--ink-soft);font-size:14px;line-height:1.65;margin:0 0 18px;}
+.approval-message .btn-primary{display:inline-block;margin-top:8px;}
+.approval-rejection{padding:14px 16px;margin-bottom:20px;border-left:3px solid var(--danger);background:var(--danger-bg);color:var(--danger);}
+.approval-rejection p{margin:6px 0 0;font-size:13px;line-height:1.5;}
+.verification-form .profile-field-grid{margin-bottom:20px;}
+.verification-form .profile-field-grid .profile-field:last-child{grid-column:auto;max-width:none;}
+.verification-form .profile-field input[type="file"]{padding:9px;}
+.verification-form .profile-field small{color:var(--ink-soft);font-size:12px;line-height:1.5;}
+.verification-privacy-note{padding:13px 15px;margin-bottom:20px;border:1px solid var(--line);background:var(--cream);color:var(--ink-soft);font-size:12px;line-height:1.55;}
+.verification-form .btn-primary{font:inherit;font-weight:600;}
+.verification-form .btn-primary:disabled{opacity:.6;cursor:wait;}
+.doctor-review-actions{display:flex;flex-direction:column;gap:10px;padding-top:20px;margin-top:20px;border-top:1px solid var(--line);}
+.doctor-review-actions label{font-size:13px;font-weight:600;}
+.doctor-review-actions textarea{min-height:76px;}
+.doctor-review-buttons{display:flex;justify-content:flex-end;gap:10px;}
+.doctor-review-buttons button{font:inherit;font-size:14px;font-weight:600;}
+
 
 /* for photo*/
 .hero-visual {
@@ -558,6 +581,8 @@ select.reason-select{margin-bottom:14px;}
   display: flex;
   justify-content: center;
   align-items: center;
+  .approval-badge{margin-left:76px;}
+  .role-grid{grid-template-columns:1fr;}
 }
 
 .hero-image {

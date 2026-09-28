@@ -7,7 +7,6 @@ import SiteFooter from "../components/SiteFooter.jsx";
 const roleChoices = [
   { value: "PATIENT", label: "Patient", description: "Manage your care and appointments", icon: "P" },
   { value: "DOCTOR", label: "Doctor", description: "Manage your patient queue", icon: "D" },
-  { value: "ADMIN", label: "Admin", description: "Manage the hospital", icon: "A" },
 ];
 
 const genderChoices = [
@@ -43,8 +42,10 @@ export default function Register() {
     try {
       await register(form);
       const loggedInData = await login(form.email, form.password);
-      if (loggedInData.role === "DOCTOR") navigate("/doctor-dashboard");
-      else if (loggedInData.role === "ADMIN") navigate("/admin-dashboard");
+      const account = loggedInData.user || loggedInData;
+      const role = String(account.role || account.userRole || account.accountRole || "PATIENT").toUpperCase();
+      if (role === "DOCTOR") navigate("/doctor-profile");
+      else if (role === "ADMIN") navigate("/admin-dashboard");
       else navigate("/patient-dashboard");
     } catch (err) {
       setError(err?.response?.data?.error || "Registration failed. Please try again.");
@@ -60,7 +61,7 @@ export default function Register() {
         <AuthTabs active="register" />
 
         <h1>Sign Up</h1>
-        <p className="auth-sub">Register as a patient, doctor, or admin</p>
+          <p className="auth-sub">Register as a patient or doctor</p>
 
         {error && <div className="auth-error">{error}</div>}
 
@@ -128,6 +129,7 @@ export default function Register() {
                 value={form.specialization}
                 onChange={handleChange}
                 placeholder="e.g. General Physician"
+                required
               />
             </>
           )}

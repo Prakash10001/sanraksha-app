@@ -55,6 +55,7 @@ export default function AdminDashboard() {
   const [schedule, setSchedule] = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [pendingDoctors, setPendingDoctors] = useState([]);
   const [pendingAppointments, setPendingAppointments] = useState([]);
   const [recordType, setRecordType] = useState(null);
   const [viewingRecord, setViewingRecord] = useState(null);
@@ -66,6 +67,9 @@ export default function AdminDashboard() {
   const [doctorError, setDoctorError] = useState("");
   const [patientSaving, setPatientSaving] = useState(false);
   const [doctorSaving, setDoctorSaving] = useState(false);
+  const [approvalSavingId, setApprovalSavingId] = useState(null);
+  const [approvalError, setApprovalError] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
   const [loading, setLoading] = useState(true);
   const [currentHour, setCurrentHour] = useState(() => new Date().getHours());
 
@@ -133,6 +137,8 @@ export default function AdminDashboard() {
       ? patients
       : recordType === "doctors"
         ? doctors
+        : recordType === "doctor-approvals"
+          ? pendingDoctors
         : recordType === "pending"
           ? (pendingAppointments.length > 0 ? pendingAppointments : schedule).filter((item) => {
               const status = String(item.status || item.appointmentStatus || item.state || "").toUpperCase();
@@ -143,6 +149,7 @@ export default function AdminDashboard() {
   const recordTitle = {
     patients: "Patient records",
     doctors: "Doctor records",
+    "doctor-approvals": "Doctor applications awaiting review",
     appointments: "Today's appointments",
     pending: "Pending confirmations",
   }[recordType];
@@ -150,6 +157,49 @@ export default function AdminDashboard() {
   function closeRecords() {
     setRecordType(null);
     setViewingRecord(null);
+    setApprovalError("");
+    setRejectionReason("");
+  }
+
+  async function openDoctorApprovalRecords() {
+    setRecordType("doctor-approvals");
+    setViewingRecord(null);
+    setApprovalError("");
+    try {
+      const response = await axiosClient.get("/admin/doctors", { params: { status: "PENDING_REVIEW" } });
+      setPendingDoctors(getRecordList(response.data, ["doctors", "pendingDoctors", "doctorList", "items", "content", "data"]));
+    } catch (error) {
+      setPendingDoctors([]);
+      setApprovalError(error?.response?.data?.message || error?.response?.data?.error || "Unable to load doctor applications.");
+    }
+  }
+
+  async function handleDoctorApproval(doctor, status) {
+    const doctorId = doctor.id || doctor.doctorId;
+    if (!doctorId) {
+      setApprovalError("The doctor record is missing its ID.");
+      return;
+    }
+    if (status === "REJECTED" && !rejectionReason.trim()) {
+      setApprovalError("Add a reason before rejecting this application.");
+      return;
+    }
+
+    setApprovalSavingId(String(doctorId));
+    setApprovalError("");
+    try {
+      await axiosClient.patch(`/admin/doctors/${doctorId}/approval`, {
+        status,
+        rejectionReason: status === "REJECTED" ? rejectionReason.trim() : null,
+      });
+      setPendingDoctors((current) => current.filter((item) => String(item.id || item.doctorId) !== String(doctorId)));
+      setViewingRecord(null);
+      setRejectionReason("");
+    } catch (error) {
+      setApprovalError(error?.response?.data?.message || error?.response?.data?.error || "Unable to update doctor approval.");
+    } finally {
+      setApprovalSavingId(null);
+    }
   }
 
   async function openPendingRecords() {
@@ -310,6 +360,7 @@ export default function AdminDashboard() {
                 <h2>Quick actions</h2>
                 <button className="action-btn" type="button" onClick={() => setShowAddPatient(true)}>Add new patient</button>
                 <button className="action-btn" type="button" onClick={() => setShowAddDoctor(true)}>Add new doctor</button>
+                <button className="action-btn" type="button" onClick={openDoctorApprovalRecords}>Review doctor applications</button>
                 <button className="action-btn">Book appointment</button>
                 <button className="action-btn">View staff roster</button>
                 <button className="action-btn">Generate a bill</button>
@@ -373,6 +424,17 @@ export default function AdminDashboard() {
                     <div className="record-detail-row"><span>Availability</span><strong>{viewingRecord.availableFrom && viewingRecord.availableTo ? `${viewingRecord.availableFrom} - ${viewingRecord.availableTo}` : "-"}</strong></div>
                   </>
                 )}
+                {recordType === "doctor-approvals" && (
+                  <>
+                    <div className="record-detail-row"><span>Name</span><strong>{viewingRecord.user?.fullName || viewingRecord.fullName || viewingRecord.name || "-"}</strong></div>
+                    <div className="record-detail-row"><span>Email</span><strong>{viewingRecord.user?.email || viewingRecord.email || "-"}</strong></div>
+                    <div className="record-detail-row"><span>Phone</span><strong>{viewingRecord.phone || "-"}</strong></div>
+                    <div className="record-detail-row"><span>Specialization</span><strong>{viewingRecord.specialization || "-"}</strong></div>
+                    <div className="record-detail-row"><span>Medical registration</span><strong>{viewingRecord.medicalRegistrationNumber || "-"}</strong></div>
+                    <div className="record-detail-row"><span>Submitted</span><strong>{viewingRecord.submittedAt || "-"}</strong></div>
+                    <div className="record-detail-row"><span>Identity document</span><strong>{viewingRecord.verificationDocumentUrl || viewingRecord.identityDocumentUrl ? <a href={viewingRecord.verificationDocumentUrl || viewingRecord.identityDocumentUrl} target="_blank" rel="noreferrer">Open secure document</a> : "Not provided"}</strong></div>
+                  </>
+                )}
                 {(recordType === "appointments" || recordType === "pending") && (
                   <>
                     <div className="record-detail-row"><span>Patient</span><strong>{viewingRecord.patientName || viewingRecord.name || "-"}</strong></div>
@@ -383,13 +445,33 @@ export default function AdminDashboard() {
                   </>
                 )}
                 <button className="btn-secondary record-back" type="button" onClick={() => setViewingRecord(null)}>Back to list</button>
+                {recordType === "doctor-approvals" && (
+                  <div className="doctor-review-actions">
+                    {approvalError && <div className="auth-error" role="alert">{approvalError}</div>}
+                    <label htmlFor="doctor-rejection-reason">Rejection reason</label>
+                    <textarea id="doctor-rejection-reason" rows="3" value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} placeholder="Required only when rejecting" />
+                    <div className="doctor-review-buttons">
+                      <button className="btn-danger" type="button" disabled={approvalSavingId === String(viewingRecord.id || viewingRecord.doctorId)} onClick={() => handleDoctorApproval(viewingRecord, "REJECTED")}>
+                        {approvalSavingId === String(viewingRecord.id || viewingRecord.doctorId) ? "Saving..." : "Reject"}
+                      </button>
+                      <button className="confirm-btn" type="button" disabled={approvalSavingId === String(viewingRecord.id || viewingRecord.doctorId)} onClick={() => handleDoctorApproval(viewingRecord, "APPROVED")}>
+                        {approvalSavingId === String(viewingRecord.id || viewingRecord.doctorId) ? "Saving..." : "Approve doctor"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : records.length === 0 ? (
+              <>
+              {approvalError && <div className="auth-error" role="alert">{approvalError}</div>}
               <p>
-                {recordType === "pending" && stats?.pendingAppointments > 0
+                {recordType === "doctor-approvals"
+                  ? "There are no doctor applications awaiting review."
+                  : recordType === "pending" && stats?.pendingAppointments > 0
                   ? `${stats.pendingAppointments} pending confirmation exists, but appointment details were not returned by the backend.`
                   : `No ${recordType} found.`}
               </p>
+              </>
             ) : (
               <div className="record-modal-list">
                 {records.map((record, index) => (
