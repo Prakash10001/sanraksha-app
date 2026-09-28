@@ -12,6 +12,7 @@ import Register from "./pages/Register.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
 import CompleteProfile from "./pages/CompleteProfile.jsx";
+import DoctorProfile from "./pages/DoctorProfile.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={["DOCTOR"]} />}>
+        <Route path="/doctor-profile" element={<DoctorProfile />} />
         <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
       </Route>
 

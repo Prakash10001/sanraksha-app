@@ -59,16 +59,18 @@ export default function BookAppointment() {
         const doctorList = Array.isArray(data)
           ? data
           : data.doctors || data.doctorList || data.content || data.items || data.data || [];
-        const normalizedDoctors = doctorList.map((item) => ({
-          id: item.id,
-          name: item.user?.fullName || item.fullName || item.name || "Unnamed doctor",
-          email: item.user?.email || item.email || "",
-          specialization: item.specialization || item.department || "General medicine",
-          department: item.department || "",
-          nextAvailable: item.availableFrom && item.availableTo
-            ? `${item.availableFrom} - ${item.availableTo}`
-            : "available",
-        }));
+        const normalizedDoctors = doctorList
+          .filter((item) => String(item.approvalStatus || item.status || "").toUpperCase() === "APPROVED")
+          .map((item) => ({
+            id: item.id,
+            name: item.user?.fullName || item.fullName || item.name || "Unnamed doctor",
+            email: item.user?.email || item.email || "",
+            specialization: item.specialization || item.department || "General medicine",
+            department: item.department || "",
+            nextAvailable: item.availableFrom && item.availableTo
+              ? `${item.availableFrom} - ${item.availableTo}`
+              : "available",
+          }));
         setDoctors(normalizedDoctors);
         setDoctor(normalizedDoctors[0]?.name || "");
         setDepartment(normalizedDoctors[0]?.specialization || DEPARTMENTS[0]);

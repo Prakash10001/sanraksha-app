@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import axiosClient from "../api/axiosClient";
 import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header.jsx";
@@ -70,6 +71,9 @@ function belongsToDoctor(appointment, user) {
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [approvalStatus, setApprovalStatus] = useState(null);
+  const [approvalError, setApprovalError] = useState("");
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointmentIndex, setSelectedAppointmentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -91,8 +95,36 @@ export default function DoctorDashboard() {
 
   useEffect(() => {
     let ignore = false;
+    axiosClient.get("/doctors/me/profile")
+      .then(({ data }) => {
+        const profile = data?.doctor || data?.profile || data?.data || data || {};
+        const status = String(profile.approvalStatus || profile.status || "PENDING_REVIEW").toUpperCase();
+        if (!ignore) {
+          setApprovalStatus(status);
+          if (status !== "APPROVED") navigate("/doctor-profile", { replace: true });
+        }
+      })
+      .catch((error) => {
+        if (ignore) return;
+        if (error?.response?.status === 404) {
+          navigate("/doctor-profile", { replace: true });
+          return;
+        }
+        setApprovalStatus("ERROR");
+        setApprovalError(error?.response?.data?.message || error?.response?.data?.error || "Unable to verify your profile status.");
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    let ignore = false;
 
     async function loadAppointments() {
+      if (approvalStatus !== "APPROVED") return;
+
       const candidateEndpoints = [
         "/appointments/doctor/me",
         "/appointments/doctor",
@@ -122,7 +154,6 @@ export default function DoctorDashboard() {
             receivedUnmatchedAppointments = true;
             continue;
           }
-
           if (!ignore) {
             setAppointments(finalList);
             setQueueMessage("");
@@ -157,7 +188,7 @@ export default function DoctorDashboard() {
       ignore = true;
       clearInterval(refreshTimer);
     };
-  }, [user?.fullName, user?.email]);
+  }, [user?.fullName, user?.email, approvalStatus]);
 
   async function handleConfirmAppointment(appointmentId) {
     const appointment = appointments.find((item) => item.id === appointmentId);
@@ -181,6 +212,22 @@ export default function DoctorDashboard() {
       )
     );
     setConfirmingId(null);
+  }
+
+  if (approvalStatus !== "APPROVED") {
+    return (
+      <>
+        <Header navLinks={[]} user={{ initials, name: user?.fullName || "Doctor", role: "Doctor" }} />
+        <main className="page narrow">
+          <section className="panel approval-message">
+            <h2>{approvalStatus === "ERROR" ? "Unable to check profile status" : "Checking profile approval"}</h2>
+            <p>{approvalError || "Your appointment dashboard is available after administrator approval."}</p>
+            <Link className="btn-primary" to="/doctor-profile">Open doctor profile</Link>
+          </section>
+        </main>
+        <SiteFooter />
+      </>
+    );
   }
 
   return (
