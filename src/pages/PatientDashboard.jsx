@@ -21,6 +21,27 @@ function readCancelledAppointment() {
   }
 }
 
+const BOOKING_OPTIONS = [
+  {
+    title: "General Consultation",
+    tag: "New patient",
+    description: "For general check-ups, seasonal illness, and first-time visits.",
+    department: "General medicine",
+  },
+  {
+    title: "Follow-up Visit",
+    tag: "Ongoing care",
+    description: "Review your progress, treatment plan, and lab results.",
+    department: "General medicine",
+  },
+  {
+    title: "Specialist Care",
+    tag: "Expert consult",
+    description: "Book with cardiology, orthopedics, dermatology, or pediatrics.",
+    department: "Cardiology",
+  },
+];
+
 export default function PatientDashboard() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState([]);
@@ -80,6 +101,22 @@ export default function PatientDashboard() {
           <Link className="btn-primary" to="/book" style={{ display: "inline-block", marginTop: 18 }}>
             Book an appointment
           </Link>
+        </div>
+
+        <div className="booking-options" aria-label="Appointment types">
+          {BOOKING_OPTIONS.map((option) => (
+            <Link
+              key={option.title}
+              className="booking-option-card"
+              to="/book"
+              state={{ department: option.department, bookingType: option.title }}
+            >
+              <span className="booking-option-tag">{option.tag}</span>
+              <h3>{option.title}</h3>
+              <p>{option.description}</p>
+              <span className="booking-option-link">Book now</span>
+            </Link>
+          ))}
         </div>
 
         <div className="stat-strip">

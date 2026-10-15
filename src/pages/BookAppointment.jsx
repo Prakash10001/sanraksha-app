@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import AppFooter from "../components/AppFooter.jsx";
 import axiosClient from "../api/axiosClient.js";
@@ -34,7 +34,9 @@ function getToday() {
 export default function BookAppointment() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [department, setDepartment] = useState(DEPARTMENTS[0]);
+  const location = useLocation();
+  const defaultDepartment = location.state?.department || DEPARTMENTS[0];
+  const [department, setDepartment] = useState(defaultDepartment);
   const [doctors, setDoctors] = useState([]);
   const [doctor, setDoctor] = useState("");
   const [loadingDoctors, setLoadingDoctors] = useState(true);
@@ -50,6 +52,10 @@ export default function BookAppointment() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  useEffect(() => {
+    setDepartment(defaultDepartment);
+  }, [defaultDepartment]);
 
   useEffect(() => {
     axiosClient
@@ -71,9 +77,15 @@ export default function BookAppointment() {
               ? `${item.availableFrom} - ${item.availableTo}`
               : "available",
           }));
+
+        const matchingDoctor = normalizedDoctors.find((doc) => {
+          const specialization = String(doc.specialization || "").toLowerCase();
+          return specialization === String(defaultDepartment || "").toLowerCase();
+        }) || normalizedDoctors[0];
+
         setDoctors(normalizedDoctors);
-        setDoctor(normalizedDoctors[0]?.name || "");
-        setDepartment(normalizedDoctors[0]?.specialization || DEPARTMENTS[0]);
+        setDoctor(matchingDoctor?.name || "");
+        setDepartment(matchingDoctor?.specialization || defaultDepartment || DEPARTMENTS[0]);
       })
       .catch((error) => {
         setDoctors([]);

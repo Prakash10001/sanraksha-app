@@ -88,7 +88,7 @@ export default function ResetPassword() {
             <p style={{ margin: "0 0 16px", fontSize: 14, color: "var(--ink-soft)" }}>
               Your password has been updated. You can now sign in with your new password.
             </p>
-            <button className="btn-primary" onClick={() => navigate(firstLogin ? "/patient-dashboard" : "/login")}>
+            <button className="btn-primary" onClick={() => navigate(firstLogin ? "/portal" : "/login")}>
               {firstLogin ? "Continue" : "Go to sign in"}
             </button>
           </div>

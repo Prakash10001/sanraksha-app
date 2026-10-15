@@ -13,7 +13,8 @@ export default function ProtectedRoute({ allowedRoles = [], redirectPath = "/log
   if (allowedRoles.length > 0 && !allowedRoles.includes(normalizedRole)) {
     if (normalizedRole === "DOCTOR") return <Navigate to="/doctor-dashboard" replace />;
     if (normalizedRole === "ADMIN") return <Navigate to="/admin-dashboard" replace />;
-    return <Navigate to="/patient-dashboard" replace />;
+    if (normalizedRole === "LAB_TECH") return <Navigate to="/lab-reports" replace />;
+    return <Navigate to="/portal" replace />;
   }
 
   return <Outlet />;

@@ -8,8 +8,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 const PATIENT_NAV = [
   { label: "My care", to: "/portal" },
   { label: "Appointments", to: "/book" },
-  { label: "Records", to: "/portal" },
-  { label: "Billing", to: "/portal" },
+  { label: "Records", to: "/records" },
+  { label: "Billing", to: "/billing" },
 ];
 
 function readCancelledAppointment() {
@@ -140,8 +140,8 @@ export default function PatientPortal() {
 
         <div className="quick-row">
           <Link className="quick-btn" to="/book">Book an appointment</Link>
-          <button className="quick-btn">Message your doctor</button>
-          <button className="quick-btn">Pay a bill</button>
+          <Link className="quick-btn" to="/records">View medical records</Link>
+          <Link className="quick-btn" to="/billing">Billing overview</Link>
         </div>
 
         <div className="panel">

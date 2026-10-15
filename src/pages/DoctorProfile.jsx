@@ -10,7 +10,22 @@ function getDoctorRecord(data) {
 }
 
 function getApiMessage(error, fallback) {
-  return error?.response?.data?.message || error?.response?.data?.error || fallback;
+  const responseData = error?.response?.data;
+  if (typeof responseData === "string" && responseData.trim()) {
+    return responseData.replace(/<[^>]*>/g, " ").trim().slice(0, 300);
+  }
+
+  const message = responseData?.message || responseData?.error || responseData?.detail || responseData?.title;
+  if (message) return String(message).slice(0, 300);
+
+  if (responseData?.errors && typeof responseData.errors === "object") {
+    const fieldErrors = Object.entries(responseData.errors)
+      .map(([field, detail]) => `${field}: ${typeof detail === "string" ? detail : detail?.message || "Invalid value"}`);
+    if (fieldErrors.length) return fieldErrors.join(" ");
+  }
+
+  const status = error?.response?.status;
+  return status ? `${fallback} (HTTP ${status})` : fallback;
 }
 
 export default function DoctorProfile() {
@@ -22,8 +37,15 @@ export default function DoctorProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [registrationNotice, setRegistrationNotice] = useState("");
 
   useEffect(() => {
+    const notice = sessionStorage.getItem("doctorRegistrationNotice");
+    if (notice) {
+      setRegistrationNotice(notice);
+      sessionStorage.removeItem("doctorRegistrationNotice");
+    }
+
     axiosClient.get("/doctors/me/profile")
       .then(({ data }) => {
         const profile = getDoctorRecord(data);
@@ -102,6 +124,7 @@ export default function DoctorProfile() {
 
         <section className="profile-form">
           {error && <div className="auth-error" role="alert">{error}</div>}
+          {registrationNotice && <div className="approval-message" role="status"><h2>Registration submitted</h2><p>{registrationNotice}</p></div>}
           {loading ? <p>Loading your profile...</p> : status === "APPROVED" ? (
             <div className="approval-message">
               <h2>Your profile is approved</h2>
@@ -111,7 +134,7 @@ export default function DoctorProfile() {
           ) : status === "PENDING_REVIEW" ? (
             <div className="approval-message">
               <h2>Your application is under review</h2>
-              <p>An administrator will review your submitted details. Your name will appear to patients after approval.</p>
+              <p>An administrator will review your submitted details. You will receive an email or in-app update once the final decision is made.</p>
             </div>
           ) : (
             <>

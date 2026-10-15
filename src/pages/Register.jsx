@@ -44,9 +44,14 @@ export default function Register() {
       const loggedInData = await login(form.email, form.password);
       const account = loggedInData.user || loggedInData;
       const role = String(account.role || account.userRole || account.accountRole || "PATIENT").toUpperCase();
-      if (role === "DOCTOR") navigate("/doctor-profile");
-      else if (role === "ADMIN") navigate("/admin-dashboard");
-      else navigate("/patient-dashboard");
+      if (role === "DOCTOR") {
+        sessionStorage.setItem(
+          "doctorRegistrationNotice",
+          "Your doctor registration has been submitted and is pending administrator review. You will receive a notification once the team reviews your application."
+        );
+        navigate("/doctor-profile");
+      } else if (role === "ADMIN") navigate("/admin-dashboard");
+      else navigate("/portal");
     } catch (err) {
       setError(err?.response?.data?.error || "Registration failed. Please try again.");
     } finally {

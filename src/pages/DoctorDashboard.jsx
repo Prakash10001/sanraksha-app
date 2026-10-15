@@ -233,7 +233,10 @@ export default function DoctorDashboard() {
   return (
     <>
       <Header
-        navLinks={[]}
+        navLinks={[
+          { label: "Dashboard", to: "/doctor-dashboard" },
+          { label: "Lab reports", to: "/lab-reports" },
+        ]}
         user={{ initials, name: user?.fullName || "Doctor", role: "Doctor" }}
       />
       <div className="page">

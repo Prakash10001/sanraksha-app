@@ -68,7 +68,7 @@ export default function CompleteProfile() {
         address: form.address.trim(),
       };
       await axiosClient.put("/patients/me", profilePayload);
-      navigate("/patient-dashboard", { replace: true });
+      navigate("/portal", { replace: true });
     } catch (requestError) {
       setError(getApiMessage(requestError, "Unable to save your profile."));
     } finally {

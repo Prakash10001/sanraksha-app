@@ -31,16 +31,17 @@ export default function Login() {
       if (mustResetPassword) navigate("/reset-password?firstLogin=true");
       else if (normalizedRole === "DOCTOR") navigate("/doctor-dashboard");
       else if (normalizedRole === "ADMIN") navigate("/admin-dashboard");
+      else if (normalizedRole === "LAB_TECH") navigate("/lab-reports");
       else {
         try {
           const profileResponse = await axiosClient.get("/patients/me");
           const profile = profileResponse.data?.patient || profileResponse.data?.data || profileResponse.data || {};
           const hasRequiredProfile = ["phone", "gender", "dateOfBirth", "bloodGroup", "address"]
             .every((field) => String(profile[field] || "").trim());
-          navigate(hasRequiredProfile ? "/patient-dashboard" : "/complete-profile");
+          navigate(hasRequiredProfile ? "/portal" : "/complete-profile");
         } catch (profileError) {
           if (profileError?.response?.status === 404) navigate("/complete-profile");
-          else navigate("/patient-dashboard");
+          else navigate("/portal");
         }
       }
     } catch (err) {
