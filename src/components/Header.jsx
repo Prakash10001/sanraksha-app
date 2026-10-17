@@ -43,16 +43,24 @@ export default function Header({ navLinks = [], user = null, cta = null, themeTo
       </button>
 
       <nav style={menuOpen ? { display: "flex", flexDirection: "column", position: "absolute", top: 68, left: 0, right: 0, background: "#fffdfb", padding: "8px 40px", borderBottom: "1px solid var(--line)" } : undefined}>
-        {navLinks.map((link) => (
+        {navLinks.map((link) => {
+          const [linkPath, linkSearch] = link.to.split("?");
+          const hasSection = new URLSearchParams(location.search).has("section");
+          const isActive = location.pathname === linkPath
+            && (linkSearch
+              ? location.search === `?${linkSearch}`
+              : !(hasSection && linkPath === location.pathname));
+          return (
           <Link
             key={link.to}
             to={link.to}
-            className={location.pathname === link.to ? "active" : ""}
+            className={isActive ? "active" : ""}
             onClick={() => setMenuOpen(false)}
           >
             {link.label}
           </Link>
-        ))}
+          );
+        })}
       </nav>
 
       {user && (

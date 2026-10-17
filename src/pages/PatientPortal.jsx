@@ -41,11 +41,37 @@ function getAppointmentDateParts(value) {
   };
 }
 
+function getLabReportList(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+
+  for (const key of ["reports", "labReports", "items", "content", "results", "data"]) {
+    const reports = getLabReportList(payload[key]);
+    if (reports.length) return reports;
+  }
+  return [];
+}
+
+function getReportId(report) {
+  return report.id || report.reportId || report.labReportId;
+}
+
+function formatReportDate(value) {
+  if (!value) return "Date not provided";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString();
+}
+
 export default function PatientPortal() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAppointmentIndex, setSelectedAppointmentIndex] = useState(0);
+  const [labReports, setLabReports] = useState([]);
+  const [labReportsLoading, setLabReportsLoading] = useState(true);
+  const [labReportsError, setLabReportsError] = useState("");
+  const [labReportsRefresh, setLabReportsRefresh] = useState(0);
+  const [downloadingReportId, setDownloadingReportId] = useState(null);
 
   const displayName = user?.fullName || user?.name || user?.email || "Patient";
   const initials = displayName
@@ -65,6 +91,63 @@ export default function PatientPortal() {
       .catch(() => setAppointments([]))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    setLabReportsLoading(true);
+    setLabReportsError("");
+
+    axiosClient
+      .get("/lab-reports/me")
+      .then(({ data }) => {
+        const reports = getLabReportList(data).filter(
+          (report) => String(report.status || "").toUpperCase() === "PUBLISHED"
+        );
+        if (!ignore) setLabReports(reports);
+      })
+      .catch(() => {
+        if (!ignore) {
+          setLabReports([]);
+          setLabReportsError("Unable to load your released lab reports. Please try again.");
+        }
+      })
+      .finally(() => {
+        if (!ignore) setLabReportsLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [labReportsRefresh]);
+
+  async function downloadLabReport(report) {
+    const reportId = getReportId(report);
+    if (!reportId) {
+      setLabReportsError("This report cannot be downloaded because it has no report ID.");
+      return;
+    }
+
+    setDownloadingReportId(reportId);
+    setLabReportsError("");
+    try {
+      const response = await axiosClient.get(`/lab-reports/${reportId}/download`, { responseType: "blob" });
+      const objectUrl = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      const disposition = response.headers["content-disposition"] || "";
+      const filename = disposition.match(/filename\*?=(?:UTF-8''|\")?([^;\"]+)/i)?.[1]
+        || `lab-report-${reportId}.pdf`;
+      link.href = objectUrl;
+      link.download = decodeURIComponent(filename.replace(/\"/g, ""));
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch {
+      setLabReportsError("Unable to download this report. Please try again.");
+    } finally {
+      setDownloadingReportId(null);
+    }
+  }
 
   const cancelledAppointment = readCancelledAppointment();
   const selectedAppointment = appointments[Math.min(selectedAppointmentIndex, Math.max(appointments.length - 1, 0))];
@@ -145,8 +228,44 @@ export default function PatientPortal() {
         </div>
 
         <div className="panel">
-          <h2>Your recent records</h2>
-          <p>{appointments.length > 0 ? "Medical records will appear here when provided by the hospital." : "No medical records available yet."}</p>
+          <div className="portal-section-header">
+            <h2>Released lab reports</h2>
+            <Link className="portal-section-link" to="/records">View all records</Link>
+          </div>
+          <p>Reports reviewed and published by your care team are available here.</p>
+          {labReportsLoading ? (
+            <p>Loading your released lab reports...</p>
+          ) : labReportsError ? (
+            <div>
+              <p role="alert">{labReportsError}</p>
+              <button type="button" className="portal-section-link" onClick={() => setLabReportsRefresh((value) => value + 1)}>Try again</button>
+            </div>
+          ) : labReports.length === 0 ? (
+            <p>No released lab reports are available yet.</p>
+          ) : (
+            <div className="record-list">
+              {labReports.slice(0, 3).map((report, index) => {
+                const reportId = getReportId(report);
+                const testName = report.testName || report.name || report.testType || "Lab report";
+                const reportDate = report.resultDate || report.orderedAt || report.reportDate;
+                return (
+                  <div className="record-item" key={reportId || `${testName}-${index}`}>
+                    <span>{testName}</span>
+                    <strong>{formatReportDate(reportDate)}</strong>
+                    <small>{[report.status, report.doctorName].filter(Boolean).join(" • ") || "Published by your care team"}</small>
+                    <button
+                      type="button"
+                      className="record-download"
+                      disabled={!reportId || downloadingReportId === reportId}
+                      onClick={() => downloadLabReport(report)}
+                    >
+                      {downloadingReportId === reportId ? "Downloading..." : "Download report"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="panel">

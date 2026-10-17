@@ -137,6 +137,7 @@ export default function Records() {
       ? "Loading..."
       : `${appointments.length} ${appointments.length === 1 ? "appointment" : "appointments"}`,
     entries: appointments.map((appointment, index) => {
+      const appointmentId = appointment.id || appointment.appointmentId || appointment.appointment_id;
       const doctor = appointment.doctorName || appointment.doctor?.user?.fullName || appointment.doctor?.fullName || "Doctor to be assigned";
       const department = appointment.department || appointment.doctor?.specialization;
       const date = appointment.appointmentDate || appointment.dateTime || appointment.date || appointment.time;
@@ -147,7 +148,7 @@ export default function Records() {
       const reason = appointment.reason || appointment.notes;
 
       return {
-        label: appointment.reference || `Appointment ${index + 1}`,
+        label: `Appointment ID: ${appointmentId ?? "Unavailable"}`,
         value: dateLabel,
         meta: [doctor, department, status, reason].filter(Boolean).join(" • "),
       };
