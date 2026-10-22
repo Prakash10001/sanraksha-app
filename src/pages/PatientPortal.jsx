@@ -66,6 +66,9 @@ export default function PatientPortal() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [billingInvoices, setBillingInvoices] = useState([]);
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [billingError, setBillingError] = useState("");
   const [selectedAppointmentIndex, setSelectedAppointmentIndex] = useState(0);
   const [labReports, setLabReports] = useState([]);
   const [labReportsLoading, setLabReportsLoading] = useState(true);
@@ -90,6 +93,28 @@ export default function PatientPortal() {
       })
       .catch(() => setAppointments([]))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    setBillingLoading(true);
+    setBillingError("");
+
+    axiosClient
+      .get("/patient/billing/invoices")
+      .then(({ data }) => {
+        if (!ignore) setBillingInvoices(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!ignore) setBillingError("Unable to load your billing information. Please try again.");
+      })
+      .finally(() => {
+        if (!ignore) setBillingLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -150,6 +175,9 @@ export default function PatientPortal() {
   }
 
   const cancelledAppointment = readCancelledAppointment();
+  const outstandingBalance = billingInvoices
+    .filter((invoice) => invoice.status !== "PAID")
+    .reduce((total, invoice) => total + (Number(invoice.amountPaise) || 0), 0);
   const selectedAppointment = appointments[Math.min(selectedAppointmentIndex, Math.max(appointments.length - 1, 0))];
   const dateParts = getAppointmentDateParts(selectedAppointment?.appointmentDate || selectedAppointment?.date || selectedAppointment?.time);
   const doctorName = selectedAppointment?.doctorName || selectedAppointment?.doctor?.user?.fullName || selectedAppointment?.doctor?.fullName || "Doctor to be assigned";
@@ -272,9 +300,34 @@ export default function PatientPortal() {
           <h2>Billing</h2>
           <div className="billing-row">
             <div className="billing-amount">
-              <span className="value">-</span>
-              <span className="label">No billing information available</span>
+              {billingLoading ? (
+                <>
+                  <span className="value">Loading...</span>
+                  <span className="label">Checking your invoices</span>
+                </>
+              ) : billingError ? (
+                <span className="label form-error" role="alert">{billingError}</span>
+              ) : billingInvoices.length === 0 ? (
+                <>
+                  <span className="value">₹0.00</span>
+                  <span className="label">No invoices have been issued for your account.</span>
+                </>
+              ) : (
+                <>
+                  <span className="value">
+                    {new Intl.NumberFormat("en-IN", {
+                      style: "currency",
+                      currency: "INR",
+                      maximumFractionDigits: 2,
+                    }).format(outstandingBalance / 100)}
+                  </span>
+                  <span className="label">
+                    Outstanding balance · {billingInvoices.length} {billingInvoices.length === 1 ? "invoice" : "invoices"}
+                  </span>
+                </>
+              )}
             </div>
+            <Link className="btn-primary" to="/billing">View billing details</Link>
           </div>
         </div>
       </div>

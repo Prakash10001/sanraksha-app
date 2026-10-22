@@ -13,7 +13,8 @@ export default function Header({ navLinks = [], user = null, cta = null, themeTo
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user: authUser } = useAuth();
+  const isPatient = String(authUser?.role || "").toUpperCase() === "PATIENT";
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
@@ -65,7 +66,20 @@ export default function Header({ navLinks = [], user = null, cta = null, themeTo
 
       {user && (
         <div className="user-menu">
-          <div className="user-avatar">{user.initials}</div>
+          {isPatient ? (
+            <Link
+              to="/complete-profile"
+              state={{ returnTo: `${location.pathname}${location.search}` }}
+              className="user-avatar-link"
+              aria-label="Update profile details"
+              title="Update profile details"
+              onClick={() => setMenuOpen(false)}
+            >
+              <div className="user-avatar">{user.initials}</div>
+            </Link>
+          ) : (
+            <div className="user-avatar">{user.initials}</div>
+          )}
           <div>
             <div className="user-name">{user.name}</div>
             <div className="user-role">{user.role}</div>

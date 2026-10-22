@@ -5,6 +5,7 @@ import AppFooter from "../components/AppFooter.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import axiosClient from "../api/axiosClient.js";
 import loadRazorpayCheckout from "../api/razorpayCheckout.js";
+import downloadInvoicePdf from "../utils/invoicePdf.js";
 
 const PATIENT_NAV = [
   { label: "My care", to: "/portal" },
@@ -195,7 +196,7 @@ export default function Billing() {
                   <th>Issued</th>
                   <th>Amount</th>
                   <th>Status</th>
-                  <th>Action</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -208,6 +209,14 @@ export default function Billing() {
                     <td>{formatAmount(invoice.amountPaise, invoice.currency)}</td>
                     <td>{invoice.status === "PAID" ? `Paid${invoice.paidAt ? ` · ${formatDate(invoice.paidAt)}` : ""}` : "Pending"}</td>
                     <td>
+                      <div className="invoice-row-actions">
+                        <button
+                          type="button"
+                          className="btn-secondary invoice-download-button"
+                          onClick={() => downloadInvoicePdf(invoice)}
+                        >
+                          Download
+                        </button>
                       {invoice.status !== "PAID" && (
                         <button
                           type="button"
@@ -218,6 +227,7 @@ export default function Billing() {
                           {payingInvoiceId === invoice.id ? "Opening…" : "Pay invoice"}
                         </button>
                       )}
+                      </div>
                     </td>
                   </tr>
                 ))}

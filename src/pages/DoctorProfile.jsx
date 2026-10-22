@@ -4,6 +4,7 @@ import Header from "../components/Header.jsx";
 import SiteFooter from "../components/SiteFooter.jsx";
 import axiosClient from "../api/axiosClient.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import DOCTOR_SPECIALIZATIONS from "../utils/doctorSpecializations.js";
 
 function getDoctorRecord(data) {
   return data?.doctor || data?.profile || data?.data || data || {};
@@ -153,7 +154,12 @@ export default function DoctorProfile() {
                   </div>
                   <div className="profile-field">
                     <label htmlFor="doctor-specialization">Specialization</label>
-                    <input id="doctor-specialization" name="specialization" value={form.specialization} onChange={handleChange} required />
+                    <select id="doctor-specialization" name="specialization" value={form.specialization} onChange={handleChange} required>
+                      <option value="" disabled>Select a specialization</option>
+                      {DOCTOR_SPECIALIZATIONS.map((specialization) => (
+                        <option key={specialization} value={specialization}>{specialization}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="profile-field">
                     <label htmlFor="doctor-registration-number">Medical registration number</label>

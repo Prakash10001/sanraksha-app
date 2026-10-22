@@ -36,12 +36,18 @@ export default function Login() {
         try {
           const profileResponse = await axiosClient.get("/patients/me");
           const profile = profileResponse.data?.patient || profileResponse.data?.data || profileResponse.data || {};
-          const hasRequiredProfile = ["phone", "gender", "dateOfBirth", "bloodGroup", "address"]
+          const hasRequiredProfile = ["fullName", "phone", "gender", "dateOfBirth", "bloodGroup", "address"]
             .every((field) => String(profile[field] || "").trim());
           navigate(hasRequiredProfile ? "/portal" : "/complete-profile");
         } catch (profileError) {
           if (profileError?.response?.status === 404) navigate("/complete-profile");
-          else navigate("/portal");
+          else {
+            setError(
+              profileError?.response?.data?.message ||
+              profileError?.response?.data?.error ||
+              "Unable to check your profile details. Please try again."
+            );
+          }
         }
       }
     } catch (err) {

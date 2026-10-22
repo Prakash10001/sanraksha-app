@@ -4,20 +4,13 @@ import Header from "../components/Header.jsx";
 import AppFooter from "../components/AppFooter.jsx";
 import axiosClient from "../api/axiosClient.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import TIME_SLOTS from "../utils/appointmentTimeSlots.js";
 
 const PATIENT_NAV = [
   { label: "My care", to: "/portal" },
   { label: "Appointments", to: "/book" },
   { label: "Records", to: "/patient-dashboard" },
   { label: "Billing", to: "/portal" },
-];
-
-const TIME_SLOTS = [
-  { label: "9:00 am", available: true },
-  { label: "9:45 am", available: true },
-  { label: "10:30 am", available: true },
-  { label: "11:15 am", available: false },
-  { label: "2:00 pm", available: true },
 ];
 
 const CANCEL_REASONS = ["Schedule conflict", "Feeling better", "Finding another doctor", "Other"];
@@ -71,7 +64,7 @@ export default function ManageAppointment() {
   const [appointment, setAppointment] = useState(defaultAppointment);
   const [view, setView] = useState("main");
   const [newDate, setNewDate] = useState(getToday);
-  const [selectedTime, setSelectedTime] = useState("10:30 am");
+  const [selectedTime, setSelectedTime] = useState(TIME_SLOTS[0].label);
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
   const [cancelNote, setCancelNote] = useState("");
   const [loading, setLoading] = useState(true);

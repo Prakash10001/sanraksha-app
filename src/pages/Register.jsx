@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthTabs from "../components/AuthTabs";
 import SiteFooter from "../components/SiteFooter.jsx";
+import DOCTOR_SPECIALIZATIONS from "../utils/doctorSpecializations.js";
 
 const roleChoices = [
   { value: "PATIENT", label: "Patient", description: "Manage your care and appointments", icon: "P" },
@@ -51,7 +52,7 @@ export default function Register() {
         );
         navigate("/doctor-profile");
       } else if (role === "ADMIN") navigate("/admin-dashboard");
-      else navigate("/portal");
+      else navigate("/complete-profile");
     } catch (err) {
       setError(err?.response?.data?.error || "Registration failed. Please try again.");
     } finally {
@@ -128,14 +129,19 @@ export default function Register() {
 
           {form.role === "DOCTOR" && (
             <>
-              <label>Specialization</label>
-              <input
+              <label htmlFor="doctor-specialization">Specialization</label>
+              <select
+                id="doctor-specialization"
                 name="specialization"
                 value={form.specialization}
                 onChange={handleChange}
-                placeholder="e.g. General Physician"
                 required
-              />
+              >
+                <option value="" disabled>Select a specialization</option>
+                {DOCTOR_SPECIALIZATIONS.map((specialization) => (
+                  <option key={specialization} value={specialization}>{specialization}</option>
+                ))}
+              </select>
             </>
           )}
 

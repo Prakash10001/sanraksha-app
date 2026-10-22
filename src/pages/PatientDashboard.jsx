@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import axiosClient from "../api/axiosClient";
 import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header.jsx";
@@ -44,6 +44,7 @@ const BOOKING_OPTIONS = [
 
 export default function PatientDashboard() {
   const { user } = useAuth();
+  const location = useLocation();
   const [appointments, setAppointments] = useState([]);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -153,7 +154,13 @@ export default function PatientDashboard() {
           <div className="panel patient-summary">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
               <h2>My profile</h2>
-              <Link className="profile-edit-link" to="/complete-profile" aria-label="Edit patient details" title="Edit patient details">
+              <Link
+                className="profile-edit-link"
+                to="/complete-profile"
+                state={{ returnTo: `${location.pathname}${location.search}` }}
+                aria-label="Edit patient details"
+                title="Edit patient details"
+              >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 20h9" />
                   <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />

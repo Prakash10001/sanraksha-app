@@ -4,9 +4,11 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import axiosClient from "../api/axiosClient";
 import loadRazorpayCheckout from "../api/razorpayCheckout";
+import downloadInvoicePdf from "../utils/invoicePdf";
 import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header.jsx";
 import AppFooter from "../components/AppFooter.jsx";
+import DOCTOR_SPECIALIZATIONS from "../utils/doctorSpecializations.js";
 
 const DEFAULT_PATIENT_PAGE_SIZE = 5;
 
@@ -85,8 +87,9 @@ function normalizePatientRecord(record) {
     ...record,
     name: record.name || record.fullName || patient.fullName || user.fullName || user.name || "—",
     patientCode: record.patientCode || patient.patientCode || patient.patientId || record.patientId,
-    email: findNestedValue(record, ["email", "emailaddress", "patientemail", "emailid"]),
-    gender: findNestedValue(record, ["gender", "sex", "patientgender"]),
+    email: record.email || findNestedValue(record, ["email", "emailaddress", "patientemail", "emailid"]),
+    gender: record.gender || findNestedValue(record, ["gender", "sex", "patientgender"]),
+    phone: record.phone || findNestedValue(record, ["phone", "mobile", "mobilephone", "patientphone"]),
     registeredOn: record.registeredOn || record.createdAt || patient.createdAt || user.createdAt || "",
   };
 }
@@ -162,8 +165,13 @@ export default function AdminDashboard() {
   const [doctors, setDoctors] = useState([]);
   const [pendingDoctors, setPendingDoctors] = useState([]);
   const [pendingAppointments, setPendingAppointments] = useState([]);
+  const [todayRegisteredPatients, setTodayRegisteredPatients] = useState([]);
   const [recordType, setRecordType] = useState(null);
   const [viewingRecord, setViewingRecord] = useState(null);
+  const [identityDocumentPreviewUrl, setIdentityDocumentPreviewUrl] = useState("");
+  const [identityDocumentPreviewType, setIdentityDocumentPreviewType] = useState("");
+  const [identityDocumentLoading, setIdentityDocumentLoading] = useState(false);
+  const [identityDocumentError, setIdentityDocumentError] = useState("");
   const [showAddPatient, setShowAddPatient] = useState(false);
   const [showAddDoctor, setShowAddDoctor] = useState(false);
   const [showAddLabStaff, setShowAddLabStaff] = useState(false);
@@ -188,6 +196,8 @@ export default function AdminDashboard() {
   const [appointmentSuccess, setAppointmentSuccess] = useState("");
   const [appointmentListError, setAppointmentListError] = useState("");
   const [appointmentListLoading, setAppointmentListLoading] = useState(false);
+  const [todayPatientsLoading, setTodayPatientsLoading] = useState(false);
+  const [todayPatientsError, setTodayPatientsError] = useState("");
   const [staffError, setStaffError] = useState("");
   const [staffLoading, setStaffLoading] = useState(false);
   const [billingError, setBillingError] = useState("");
@@ -227,6 +237,11 @@ export default function AdminDashboard() {
 
     return () => clearInterval(clock);
   }, []);
+
+  useEffect(() => {
+    if (!identityDocumentPreviewUrl) return undefined;
+    return () => URL.revokeObjectURL(identityDocumentPreviewUrl);
+  }, [identityDocumentPreviewUrl]);
 
   useEffect(() => {
     if (activeSection === "appointments") {
@@ -342,12 +357,18 @@ export default function AdminDashboard() {
     .sort((first, second) => new Date(second.appointmentDate) - new Date(first.appointmentDate));
   const filteredBillingPatients = billingPatients.filter((patient) => {
     const query = billingPatientSearch.trim().toLowerCase();
-    return !query || `${patient.name} ${patient.patientCode} ${patient.email}`.toLowerCase().includes(query);
+    const searchableValues = [
+      patient.name,
+      patient.patientCode,
+      patient.id,
+      patient.email,
+    ].filter((value) => value != null);
+    return !query || searchableValues.join(" ").toLowerCase().includes(query);
   });
 
   const records =
-    recordType === "patients"
-      ? patients
+    recordType === "patients" || recordType === "today-patients"
+      ? recordType === "today-patients" ? todayRegisteredPatients : patients
       : recordType === "doctors"
         ? approvedDoctors
         : recordType === "doctor-approvals"
@@ -362,6 +383,7 @@ export default function AdminDashboard() {
 
   const recordTitle = {
     patients: "Patient records",
+    "today-patients": "Patients registered today",
     doctors: "Doctor records",
     "doctor-approvals": "Doctor applications awaiting review",
     appointments: "All appointments",
@@ -373,6 +395,26 @@ export default function AdminDashboard() {
     setRecordType("today");
     setViewingRecord(null);
     setAppointmentListError("");
+  }
+
+  async function openTodayPatientRecords() {
+    setRecordType("today-patients");
+    setViewingRecord(null);
+    setTodayPatientsLoading(true);
+    setTodayPatientsError("");
+    try {
+      const response = await axiosClient.get("/admin/patients/registered-today");
+      setTodayRegisteredPatients(getRecordList(response.data, ["patients", "items", "content", "data"]));
+    } catch (error) {
+      setTodayRegisteredPatients([]);
+      setTodayPatientsError(
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Unable to load patients registered today."
+      );
+    } finally {
+      setTodayPatientsLoading(false);
+    }
   }
 
   async function openAppointmentRecords() {
@@ -518,7 +560,8 @@ export default function AdminDashboard() {
       await loadRazorpayCheckout();
       if (!window.Razorpay) throw new Error("Razorpay Checkout did not initialize.");
 
-      const checkout = new window.Razorpay({
+      let checkout;
+      checkout = new window.Razorpay({
         key: order.keyId,
         amount: order.amountPaise,
         currency: order.currency,
@@ -528,6 +571,7 @@ export default function AdminDashboard() {
         prefill: { name: order.patientName, email: order.patientEmail },
         theme: { color: "#8a2a2a" },
         handler: async (payment) => {
+          checkout.close();
           try {
             const verified = await axiosClient.post(`/admin/invoices/${invoice.id}/verify-payment`, {
               razorpayOrderId: payment.razorpay_order_id,
@@ -558,6 +602,9 @@ export default function AdminDashboard() {
   }
 
   async function openPatientRecord(patient) {
+    setIdentityDocumentPreviewUrl("");
+    setIdentityDocumentPreviewType("");
+    setIdentityDocumentError("");
     setRecordType("patients");
     setViewingRecord(patient);
     setPatientAppointments([]);
@@ -576,6 +623,9 @@ export default function AdminDashboard() {
   function closeRecords() {
     setRecordType(null);
     setViewingRecord(null);
+    setIdentityDocumentPreviewUrl("");
+    setIdentityDocumentPreviewType("");
+    setIdentityDocumentError("");
     setApprovalError("");
     setRejectionReason("");
     if (new URLSearchParams(location.search).get("section") === "appointments") {
@@ -586,6 +636,9 @@ export default function AdminDashboard() {
   async function openDoctorApprovalRecords() {
     setRecordType("doctor-approvals");
     setViewingRecord(null);
+    setIdentityDocumentPreviewUrl("");
+    setIdentityDocumentPreviewType("");
+    setIdentityDocumentError("");
     setApprovalError("");
     try {
       const response = await axiosClient.get("/admin/doctors", { params: { status: "PENDING_REVIEW" } });
@@ -593,6 +646,45 @@ export default function AdminDashboard() {
     } catch (error) {
       setPendingDoctors([]);
       setApprovalError(error?.response?.data?.message || error?.response?.data?.error || "Unable to load doctor applications.");
+    }
+  }
+
+  async function openDoctorIdentityDocument(doctor) {
+    setIdentityDocumentLoading(true);
+    setIdentityDocumentError("");
+    setIdentityDocumentPreviewUrl("");
+    setIdentityDocumentPreviewType("");
+
+    try {
+      const response = await axiosClient.get(
+        `/admin/doctors/${doctor.id}/identity-document`,
+        { responseType: "blob" }
+      );
+      const contentType = (response.headers["content-type"] || response.data.type || "")
+        .split(";")[0]
+        .toLowerCase();
+      if (!["application/pdf", "image/jpeg", "image/png"].includes(contentType) || response.data.size === 0) {
+        throw new Error("The identity document could not be previewed.");
+      }
+
+      setIdentityDocumentPreviewType(contentType);
+      setIdentityDocumentPreviewUrl(URL.createObjectURL(response.data));
+    } catch (error) {
+      let message = error?.response?.data?.message || error?.response?.data?.error;
+      if (!message && error?.response?.data instanceof Blob) {
+        try {
+          const errorText = await error.response.data.text();
+          const errorBody = JSON.parse(errorText);
+          message = errorBody.message || errorBody.error;
+        } catch {
+          message = "";
+        }
+      }
+      setIdentityDocumentError(
+        message || error.message || "Unable to load the doctor's identity document."
+      );
+    } finally {
+      setIdentityDocumentLoading(false);
     }
   }
 
@@ -957,19 +1049,20 @@ export default function AdminDashboard() {
       autoTable(pdf, {
         startY: 51,
         margin: { top: 51, right: 14, bottom: 20, left: 14 },
-        head: [["Name", "Doctor", "Patient ID", "Gender", "Registered On"]],
+        head: [["Name", "Doctor", "Patient ID", "Gender", "Phone", "Registered On"]],
         body: patientsForPdf.map((patient) => [
           patient.name || patient.fullName || patient.user?.fullName || "—",
           patient.doctorName || patient.doctor?.fullName || patient.doctor?.user?.fullName || patient.assignedDoctor || "—",
           patient.patientCode || patient.id || "—",
           patient.gender || "—",
+          patient.phone || "—",
           formatPatientDate(patient.registeredOn || patient.createdAt),
         ]),
         theme: "grid",
         styles: { font: "helvetica", fontSize: 9, cellPadding: 4, lineColor: [226, 218, 211], lineWidth: 0.2, textColor: [54, 44, 42] },
         headStyles: { fillColor: [138, 42, 42], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
         alternateRowStyles: { fillColor: [250, 247, 244] },
-        columnStyles: { 2: { cellWidth: 32 }, 3: { cellWidth: 30 }, 4: { cellWidth: 40 } },
+        columnStyles: { 2: { cellWidth: 28 }, 3: { cellWidth: 24 }, 4: { cellWidth: 30 }, 5: { cellWidth: 36 } },
         didDrawPage: ({ pageNumber }) => {
           pdf.addImage(logo, "PNG", 14, 10, 15, 17);
           pdf.setTextColor(138, 42, 42);
@@ -1227,7 +1320,17 @@ export default function AdminDashboard() {
                   onChange={(event) => setBillingPatientSearch(event.target.value)}
                   placeholder="Search by patient name, ID, or email"
                   disabled={billingLoading}
+                  aria-describedby="billing-patient-search-result"
                 />
+                <p id="billing-patient-search-result" className="billing-selected-patient" aria-live="polite">
+                  {billingLoading
+                    ? "Loading patients..."
+                    : filteredBillingPatients.length === 0
+                      ? billingPatientSearch.trim()
+                        ? "No patients match your search. Try the patient's name, email, ID, or patient code."
+                        : "No patients are available."
+                      : `${filteredBillingPatients.length} ${filteredBillingPatients.length === 1 ? "patient" : "patients"} found. Select a patient below.`}
+                </p>
                 <label htmlFor="invoice-patient">Patient</label>
                 <select
                   id="invoice-patient"
@@ -1244,9 +1347,6 @@ export default function AdminDashboard() {
                     </option>
                   ))}
                 </select>
-                {billingPatients.length === 0 && !billingLoading && (
-                  <p>No patients are available for billing.</p>
-                )}
                 {selectedBillingPatient && (
                   <p className="billing-selected-patient">
                     Selected: <strong>{selectedBillingPatient.name}</strong> · {selectedBillingPatient.email || "No registered email"}
@@ -1303,7 +1403,7 @@ export default function AdminDashboard() {
                       <th>Amount</th>
                       <th>Issued</th>
                       <th>Status</th>
-                      <th>Payment</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1318,18 +1418,25 @@ export default function AdminDashboard() {
                         <td>{formatPatientDate(invoice.createdAt)}</td>
                         <td><span className={`staff-status staff-status-${String(invoice.status).toLowerCase()}`}>{invoice.status}</span></td>
                         <td>
-                          {invoice.status === "PAID" ? (
-                            <span>{formatPatientDate(invoice.paidAt)}</span>
-                          ) : (
+                          <div className="invoice-row-actions">
                             <button
-                              className="confirm-btn invoice-pay-button"
+                              className="btn-secondary invoice-download-button"
                               type="button"
-                              disabled={!razorpayConfig.enabled || payingInvoiceId != null}
-                              onClick={() => handleCollectPayment(invoice)}
+                              onClick={() => downloadInvoicePdf(invoice)}
                             >
-                              {payingInvoiceId === invoice.id ? "Opening checkout..." : "Collect payment"}
+                              Download
                             </button>
-                          )}
+                            {invoice.status !== "PAID" && (
+                              <button
+                                className="confirm-btn invoice-pay-button"
+                                type="button"
+                                disabled={!razorpayConfig.enabled || payingInvoiceId != null}
+                                onClick={() => handleCollectPayment(invoice)}
+                              >
+                                {payingInvoiceId === invoice.id ? "Opening checkout..." : "Collect payment"}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1342,10 +1449,10 @@ export default function AdminDashboard() {
           <>
             <div className="stat-strip">
               <div className="stat">
-                <button className="stat-value-button" type="button" onClick={() => setRecordType("patients")}>
-                  <span className="value">{stats?.totalPatients ?? 0}</span>
+                <button className="stat-value-button" type="button" onClick={openTodayPatientRecords}>
+                  <span className="value">{stats?.patientsRegisteredToday ?? 0}</span>
                 </button>
-                <span className="label">Total patients registered</span>
+                <span className="label">Patients registered today</span>
               </div>
               <div className="stat">
                 <button className="stat-value-button" type="button" onClick={openTodayAppointments}>
@@ -1444,18 +1551,20 @@ export default function AdminDashboard() {
                     <th>Doctor</th>
                     <th>Patient ID</th>
                     <th>Gender</th>
+                    <th>Phone</th>
                     <th>Registered On</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visiblePatients.length === 0 ? (
-                    <tr><td className="patient-empty-row" colSpan="5">No patient records available.</td></tr>
+                    <tr><td className="patient-empty-row" colSpan="6">No patient records available.</td></tr>
                   ) : visiblePatients.map((p, index) => (
                     <tr key={p.patientCode || p.id || p.email || `${patientsPage}-${index}`}>
                       <td>{p.name || p.fullName || p.user?.fullName || "—"}</td>
                       <td>{p.doctorName || p.doctor?.fullName || p.doctor?.user?.fullName || p.assignedDoctor || "—"}</td>
                       <td>{p.patientCode || p.id || "—"}</td>
                       <td>{p.gender || "—"}</td>
+                      <td>{p.phone || "—"}</td>
                       <td>{formatPatientDate(p.registeredOn || p.createdAt)}</td>
                     </tr>
                   ))}
@@ -1524,7 +1633,7 @@ export default function AdminDashboard() {
             )}
             {viewingRecord ? (
               <div className="record-details">
-                {recordType === "patients" && (
+                {(recordType === "patients" || recordType === "today-patients") && (
                   <>
                     <div className="record-detail-row"><span>Name</span><strong>{viewingRecord.name || viewingRecord.fullName || viewingRecord.user?.fullName || "-"}</strong></div>
                     <div className="record-detail-row"><span>Patient ID</span><strong>{viewingRecord.patientCode || "-"}</strong></div>
@@ -1567,7 +1676,35 @@ export default function AdminDashboard() {
                     <div className="record-detail-row"><span>Specialization</span><strong>{viewingRecord.specialization || "-"}</strong></div>
                     <div className="record-detail-row"><span>Medical registration</span><strong>{viewingRecord.medicalRegistrationNumber || "-"}</strong></div>
                     <div className="record-detail-row"><span>Submitted</span><strong>{viewingRecord.submittedAt || "-"}</strong></div>
-                    <div className="record-detail-row"><span>Identity document</span><strong>{viewingRecord.verificationDocumentUrl || viewingRecord.identityDocumentUrl ? <a href={viewingRecord.verificationDocumentUrl || viewingRecord.identityDocumentUrl} target="_blank" rel="noreferrer">Open secure document</a> : "Not provided"}</strong></div>
+                    <div className="record-detail-row">
+                      <span>Identity document</span>
+                      <strong>{viewingRecord.identityDocumentSubmitted
+                        ? viewingRecord.identityDocumentOriginalName || "Document submitted"
+                        : "Not provided"}</strong>
+                    </div>
+                    {viewingRecord.identityDocumentSubmitted && (
+                      <button
+                        className="btn-secondary doctor-identity-document-button"
+                        type="button"
+                        onClick={() => openDoctorIdentityDocument(viewingRecord)}
+                        disabled={identityDocumentLoading}
+                      >
+                        {identityDocumentLoading ? "Loading document..." : "View submitted document"}
+                      </button>
+                    )}
+                    {identityDocumentError && <p className="patient-pagination-error" role="alert">{identityDocumentError}</p>}
+                    {identityDocumentPreviewUrl && (
+                      <div className="doctor-identity-preview">
+                        {identityDocumentPreviewType === "application/pdf" ? (
+                          <iframe
+                            title="Doctor identity document"
+                            src={identityDocumentPreviewUrl}
+                          />
+                        ) : (
+                          <img src={identityDocumentPreviewUrl} alt="Doctor identity document" />
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
                 {(recordType === "appointments" || recordType === "pending" || recordType === "today") && (
@@ -1602,6 +1739,10 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+            ) : recordType === "today-patients" && todayPatientsLoading ? (
+              <p>Loading patients registered today...</p>
+            ) : recordType === "today-patients" && todayPatientsError ? (
+              <div className="auth-error" role="alert">{todayPatientsError}</div>
             ) : (recordType === "appointments" || recordType === "pending") && appointmentListLoading ? (
               <p>Loading appointments...</p>
             ) : (recordType === "appointments" || recordType === "pending") && appointmentListError ? (
@@ -1610,7 +1751,9 @@ export default function AdminDashboard() {
               <>
               {approvalError && <div className="auth-error" role="alert">{approvalError}</div>}
               <p>
-                {recordType === "doctor-approvals"
+                {recordType === "today-patients"
+                  ? "No patients were registered today."
+                  : recordType === "doctor-approvals"
                   ? "There are no doctor applications awaiting review."
                   : recordType === "pending"
                   ? "There are no appointments waiting for doctor confirmation."
@@ -1626,13 +1769,26 @@ export default function AdminDashboard() {
                       : record.name || record.fullName || record.patientName || record.doctorName || record.user?.fullName || "Unnamed"}</strong>
                     <span>{recordType === "appointments" || recordType === "pending" || recordType === "today"
                       ? formatAppointmentDate(record.appointmentDate || record.time)
-                      : record.time || record.patientCode || record.doctorCode || record.email || record.user?.email || `Doctor ID: ${record.id || "-"}`}</span>
+                      : recordType === "today-patients"
+                        ? formatPatientDate(record.registeredOn || record.createdAt)
+                        : record.time || record.patientCode || record.doctorCode || record.email || record.user?.email || `Doctor ID: ${record.id || "-"}`}</span>
                     <span>{recordType === "appointments" || recordType === "pending"
                       ? `${record.doctorName || "Doctor"} · ${record.status || "PENDING"}`
                       : recordType === "today"
                         ? `${record.doctorName || "Doctor"} · ${record.status || "PENDING"}`
+                        : recordType === "today-patients"
+                          ? `${record.patientCode || "Patient"} · ${record.gender || "Gender not provided"} · ${record.phone || "Phone not provided"}`
                       : record.specialization || record.status || record.gender || record.registeredOn || "-"}</span>
-                    <button className="record-view-button" type="button" aria-label={`View details for ${record.patientName || record.name || record.fullName || record.user?.fullName || "record"}`} title="View details" onClick={() => setViewingRecord(record)}>
+                    <button className="record-view-button" type="button" aria-label={`View details for ${record.patientName || record.name || record.fullName || record.user?.fullName || "record"}`} title="View details" onClick={() => {
+                      if (recordType === "today-patients") {
+                        openPatientRecord(record);
+                        return;
+                      }
+                      setViewingRecord(record);
+                      setIdentityDocumentPreviewUrl("");
+                      setIdentityDocumentPreviewType("");
+                      setIdentityDocumentError("");
+                    }}>
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="2.5" /></svg>
                     </button>
                   </div>
@@ -1798,7 +1954,12 @@ export default function AdminDashboard() {
               <input id="doctor-password" type="password" name="password" value={doctorForm.password} onChange={handleDoctorChange} minLength={6} required />
 
               <label htmlFor="doctor-specialization">Specialization</label>
-              <input id="doctor-specialization" name="specialization" value={doctorForm.specialization} onChange={handleDoctorChange} placeholder="e.g. Cardiology" required />
+              <select id="doctor-specialization" name="specialization" value={doctorForm.specialization} onChange={handleDoctorChange} required>
+                <option value="" disabled>Select a specialization</option>
+                {DOCTOR_SPECIALIZATIONS.map((specialization) => (
+                  <option key={specialization} value={specialization}>{specialization}</option>
+                ))}
+              </select>
 
               <button className="confirm-btn" type="submit" disabled={doctorSaving}>
                 {doctorSaving ? "Adding doctor..." : "Add doctor"}

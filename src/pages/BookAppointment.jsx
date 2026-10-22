@@ -4,6 +4,8 @@ import Header from "../components/Header.jsx";
 import AppFooter from "../components/AppFooter.jsx";
 import axiosClient from "../api/axiosClient.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import DOCTOR_SPECIALIZATIONS from "../utils/doctorSpecializations.js";
+import TIME_SLOTS from "../utils/appointmentTimeSlots.js";
 
 const PATIENT_NAV = [
   { label: "My care", to: "/portal" },
@@ -12,17 +14,22 @@ const PATIENT_NAV = [
   { label: "Billing", to: "/portal" },
 ];
 
-const DEPARTMENTS = ["Cardiology", "Orthopedics", "General medicine", "Pediatrics", "Dermatology"];
+function getSlotKey(doctorId, date, time) {
+  return `${doctorId}|${date}|${time}`;
+}
 
-const TIME_SLOTS = [
-  { label: "9:00 am", available: true },
-  { label: "9:45 am", available: true },
-  { label: "10:30 am", available: true },
-  { label: "11:15 am", available: false },
-  { label: "2:00 pm", available: true },
-  { label: "2:45 pm", available: true },
-  { label: "22:45 pm", available: true },
-];
+function isAppointmentConflict(error) {
+  const message = String(
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.response?.data?.detail ||
+    error?.message ||
+    ""
+  );
+  return error?.response?.status === 409 ||
+    error?.response?.status === 423 ||
+    /\b(already booked|already taken|not available|unavailable|time slot|appointment conflict)\b/i.test(message);
+}
 
 function getToday() {
   const today = new Date();
@@ -35,16 +42,18 @@ export default function BookAppointment() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const defaultDepartment = location.state?.department || DEPARTMENTS[0];
+  const defaultDepartment = location.state?.department || DOCTOR_SPECIALIZATIONS[0];
   const [department, setDepartment] = useState(defaultDepartment);
   const [doctors, setDoctors] = useState([]);
-  const [doctor, setDoctor] = useState("");
+  const [doctorId, setDoctorId] = useState("");
   const [loadingDoctors, setLoadingDoctors] = useState(true);
   const [doctorError, setDoctorError] = useState("");
   const [date, setDate] = useState(getToday);
-  const [time, setTime] = useState("9:45 am");
+  const [time, setTime] = useState(TIME_SLOTS[0].label);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [unavailableSlots, setUnavailableSlots] = useState(() => new Set());
+  const [bookingError, setBookingError] = useState("");
   const displayName = user?.fullName || user?.name || user?.email || "Patient";
   const initials = displayName
     .split(" ")
@@ -70,22 +79,14 @@ export default function BookAppointment() {
           .map((item) => ({
             id: item.id,
             name: item.user?.fullName || item.fullName || item.name || "Unnamed doctor",
-            email: item.user?.email || item.email || "",
             specialization: item.specialization || item.department || "General medicine",
-            department: item.department || "",
+            department: item.department || item.specialization || "General medicine",
             nextAvailable: item.availableFrom && item.availableTo
               ? `${item.availableFrom} - ${item.availableTo}`
               : "available",
           }));
 
-        const matchingDoctor = normalizedDoctors.find((doc) => {
-          const specialization = String(doc.specialization || "").toLowerCase();
-          return specialization === String(defaultDepartment || "").toLowerCase();
-        }) || normalizedDoctors[0];
-
         setDoctors(normalizedDoctors);
-        setDoctor(matchingDoctor?.name || "");
-        setDepartment(matchingDoctor?.specialization || defaultDepartment || DEPARTMENTS[0]);
       })
       .catch((error) => {
         setDoctors([]);
@@ -98,11 +99,27 @@ export default function BookAppointment() {
       .finally(() => setLoadingDoctors(false));
   }, []);
 
+  const matchingDoctors = doctors.filter((doc) => {
+    const selectedDepartment = String(department).trim().toLowerCase();
+    return [doc.specialization, doc.department].some(
+      (value) => String(value || "").trim().toLowerCase() === selectedDepartment
+    );
+  });
+  const selectedDoctor = matchingDoctors.find((doc) => String(doc.id) === String(doctorId));
+  const selectedSlotUnavailable = TIME_SLOTS.find((slot) => slot.label === time)?.available === false ||
+    Boolean(selectedDoctor && unavailableSlots.has(getSlotKey(selectedDoctor.id, date, time)));
+
+  useEffect(() => {
+    if (!matchingDoctors.some((doc) => String(doc.id) === String(doctorId))) {
+      const firstDoctorId = matchingDoctors[0]?.id;
+      setDoctorId(firstDoctorId === undefined || firstDoctorId === null ? "" : String(firstDoctorId));
+    }
+  }, [department, doctors]);
+
   async function handleConfirm() {
     setSubmitting(true);
 
     try {
-      const selectedDoctor = doctors.find((item) => item.name === doctor);
       if (!selectedDoctor) {
         window.alert("Please select an available doctor.");
         return;
@@ -121,10 +138,15 @@ export default function BookAppointment() {
       });
 
       navigate("/book/confirmed", {
-        state: { department, doctor, date, time, reason, appointment: response.data },
+        state: { department, doctor: selectedDoctor.name, date, time, reason, appointment: response.data },
       });
     } catch (error) {
-      window.alert(error?.response?.data?.message || error?.response?.data?.error || "Unable to book the appointment.");
+      if (isAppointmentConflict(error)) {
+        setUnavailableSlots((current) => new Set(current).add(getSlotKey(selectedDoctor.id, date, time)));
+        setBookingError("That appointment time has just been booked. Please choose another available time.");
+      } else {
+        window.alert(error?.response?.data?.message || error?.response?.data?.error || "Unable to book the appointment.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -141,20 +163,29 @@ export default function BookAppointment() {
         <div className="page-head">
           <Link className="back" to="/portal">← Back to my care</Link>
           <h1>Book an appointment</h1>
-          <p>Choose a department, doctor, and time that works for you.</p>
+          <p>Tell us what you need care for, then choose a matching doctor and appointment time.</p>
         </div>
 
         <div className="step">
           <div className="step-label">1. What is this visit for?</div>
-          <div className="chip-row">
-            {DEPARTMENTS.map((d) => (
+          <div className="specialty-list" role="group" aria-label="Choose a medical specialty">
+            {DOCTOR_SPECIALIZATIONS.map((d) => (
               <button
                 key={d}
                 type="button"
-                className={`chip ${department === d ? "selected" : ""}`}
-                onClick={() => setDepartment(d)}
+                className={`specialty-link ${department === d ? "selected" : ""}`}
+                aria-pressed={department === d}
+                onClick={() => {
+                  setDepartment(d);
+                  setDoctorId("");
+                  setBookingError("");
+                  setBookingError("");
+                }}
               >
-                {d}
+                <span>{d}</span>
+                <span className="specialty-link-indicator" aria-hidden="true">
+                  {department === d ? "✓" : "›"}
+                </span>
               </button>
             ))}
           </div>
@@ -167,19 +198,35 @@ export default function BookAppointment() {
               <p>Loading doctors...</p>
             ) : doctors.length === 0 ? (
               <p>{doctorError || "No doctors available."}</p>
-            ) : doctors.map((doc) => (
-              <div
-                key={doc.name}
-                className={`doctor-card ${doctor === doc.name ? "selected" : ""}`}
-                onClick={() => setDoctor(doc.name)}
-              >
-                <div className="doctor-info">
-                  <div className="name">{doc.name}</div>
-                  <div className="meta">{doc.department || doc.specialization}</div>
-                </div>
-                <span className="doctor-slot">Next available: {doc.nextAvailable}</span>
-              </div>
-            ))}
+            ) : matchingDoctors.length === 0 ? (
+              <p>No approved doctors are available for {department}. Please choose another visit category.</p>
+            ) : matchingDoctors.map((doc) => {
+              const initials = doc.name
+                .replace(/^Dr\.?\s*/i, "")
+                .split(/\s+/)
+                .map((part) => part[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
+
+              return (
+                <button
+                  key={doc.id}
+                  type="button"
+                  className={`doctor-card ${String(doctorId) === String(doc.id) ? "selected" : ""}`}
+                  onClick={() => setDoctorId(String(doc.id))}
+                  aria-pressed={String(doctorId) === String(doc.id)}
+                >
+                  <span className="doctor-avatar" aria-hidden="true">{initials}</span>
+                  <span className="doctor-info">
+                    <span className="name">{doc.name.startsWith("Dr.") ? doc.name : `Dr. ${doc.name}`}</span>
+                    <span className="meta">{doc.specialization}</span>
+                    <span className="meta">{doc.department}</span>
+                  </span>
+                  <span className="doctor-slot">Next available: {doc.nextAvailable}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -193,18 +240,24 @@ export default function BookAppointment() {
             onChange={(e) => setDate(e.target.value)}
           />
           <div className="time-row">
-            {TIME_SLOTS.map((slot) => (
-              <button
-                key={slot.label}
-                type="button"
-                disabled={!slot.available}
-                className={`time-slot ${time === slot.label ? "selected" : ""} ${!slot.available ? "unavailable" : ""}`}
-                onClick={() => setTime(slot.label)}
-              >
-                {slot.label}
-              </button>
-            ))}
+            {TIME_SLOTS.map((slot) => {
+              const isUnavailable = !slot.available ||
+                (selectedDoctor && unavailableSlots.has(getSlotKey(selectedDoctor.id, date, slot.label)));
+
+              return (
+                <button
+                  key={slot.label}
+                  type="button"
+                  disabled={isUnavailable}
+                  className={`time-slot ${time === slot.label ? "selected" : ""} ${isUnavailable ? "unavailable" : ""}`}
+                  onClick={() => setTime(slot.label)}
+                >
+                  {isUnavailable ? `${slot.label} · Not available` : slot.label}
+                </button>
+              );
+            })}
           </div>
+          {bookingError && <p className="auth-error" role="alert">{bookingError}</p>}
         </div>
 
         <div className="step">
@@ -219,11 +272,11 @@ export default function BookAppointment() {
         <div className="summary-panel">
           <h3>Review your appointment</h3>
           <div className="summary-row"><span>Department</span><span>{department}</span></div>
-          <div className="summary-row"><span>Doctor</span><span>{doctor}</span></div>
+          <div className="summary-row"><span>Doctor</span><span>{selectedDoctor?.name || "Choose a matching doctor"}</span></div>
           <div className="summary-row"><span>Date &amp; time</span><span>{date}, {time}</span></div>
         </div>
 
-        <button type="button" className="confirm-btn" onClick={handleConfirm} disabled={submitting}>
+        <button type="button" className="confirm-btn" onClick={handleConfirm} disabled={submitting || !selectedDoctor || selectedSlotUnavailable}>
           {submitting ? "Booking..." : "Confirm appointment"}
         </button>
       </div>

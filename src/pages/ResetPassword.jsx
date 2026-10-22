@@ -3,8 +3,10 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import AppFooter from "../components/AppFooter.jsx";
 import axiosClient from "../api/axiosClient.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function ResetPassword() {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") || "";
   const firstLogin = searchParams.get("firstLogin") === "true";
@@ -15,6 +17,27 @@ export default function ResetPassword() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+
+  async function continueAfterReset() {
+    if (!firstLogin || String(user?.role || "").toUpperCase() !== "PATIENT") {
+      navigate("/portal");
+      return;
+    }
+
+    try {
+      const response = await axiosClient.get("/patients/me");
+      const profile = response.data?.patient || response.data?.data || response.data || {};
+      const hasRequiredProfile = ["fullName", "phone", "gender", "dateOfBirth", "bloodGroup", "address"]
+        .every((field) => String(profile[field] || "").trim());
+      navigate(hasRequiredProfile ? "/portal" : "/complete-profile", { replace: true });
+    } catch (profileError) {
+      setError(
+        profileError?.response?.data?.message ||
+        profileError?.response?.data?.error ||
+        "Unable to check your profile details. Please try again."
+      );
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -88,7 +111,8 @@ export default function ResetPassword() {
             <p style={{ margin: "0 0 16px", fontSize: 14, color: "var(--ink-soft)" }}>
               Your password has been updated. You can now sign in with your new password.
             </p>
-            <button className="btn-primary" onClick={() => navigate(firstLogin ? "/portal" : "/login")}>
+            {error && <div className="auth-error" role="alert">{error}</div>}
+            <button className="btn-primary" onClick={firstLogin ? continueAfterReset : () => navigate("/login")}>
               {firstLogin ? "Continue" : "Go to sign in"}
             </button>
           </div>

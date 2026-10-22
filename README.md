@@ -17,6 +17,7 @@ Then open the URL Vite prints (usually http://localhost:5173).
 |---------------------|------------------------------------|
 | `/`                 | Public landing page               |
 | `/admin-dashboard`  | Admin dashboard overview          |
+| `/complete-profile` | Complete or update patient details |
 | `/portal`           | Patient's own view ("my care")    |
 | `/book`             | Book an appointment (patient)     |
 | `/book/confirmed`   | Booking confirmation              |
@@ -27,6 +28,11 @@ Appointments, Staff, and Billing. Patients and Staff use protected admin APIs;
 Billing creates INR invoices and uses Razorpay Checkout in test mode.
 Patient Billing shows invoices assigned to the signed-in patient and supports
 paying pending invoices when Razorpay test checkout is configured.
+
+Patients with incomplete profile details are directed to `/complete-profile`
+after signing in. Patients can also open the same page from the profile avatar
+in the header to update their name, phone, gender, date of birth, blood group,
+and address.
 
 ## Structure
 
